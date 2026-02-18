@@ -1,14 +1,10 @@
 'use client';
 
+import type { AdSlot } from '@/lib/types';
+
+// Use shared AdSlot domain type to stay aligned with server data contracts and avoid UI-level type duplication.
 interface AdSlotCardProps {
-  adSlot: {
-    id: string;
-    name: string;
-    description?: string;
-    type: string;
-    basePrice: number;
-    isAvailable: boolean;
-  };
+  adSlot: AdSlot;
 }
 
 const typeColors: Record<string, string> = {

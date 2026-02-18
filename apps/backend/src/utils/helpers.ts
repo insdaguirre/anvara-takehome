@@ -1,11 +1,11 @@
 // Utility helpers for the API
 
 // Helper to safely extract route/query params
-// BUG: Return type should be 'string' but function can return empty string silently
+// BUG: Return type should be 'string' but function can return empty string silently -> resolved by throwing an error instead
 export function getParam(param: unknown): string {
   if (typeof param === 'string') return param;
   if (Array.isArray(param) && typeof param[0] === 'string') return param[0];
-  return '';
+  throw new Error('Invalid parameter');
 }
 
 // Helper to format currency values
@@ -79,3 +79,4 @@ export function formatDate(date: any): string {
   // BUG: Doesn't handle invalid dates
   return new Date(date).toLocaleDateString();
 }
+

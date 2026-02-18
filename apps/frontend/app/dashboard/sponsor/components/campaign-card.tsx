@@ -1,16 +1,7 @@
-'use client';
+import type { Campaign } from '@/lib/types';
 
 interface CampaignCardProps {
-  campaign: {
-    id: string;
-    name: string;
-    description?: string;
-    budget: number;
-    spent: number;
-    status: string;
-    startDate: string;
-    endDate: string;
-  };
+  campaign: Campaign;
 }
 
 const statusColors: Record<string, string> = {

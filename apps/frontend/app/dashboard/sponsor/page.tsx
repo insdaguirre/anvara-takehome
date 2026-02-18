@@ -2,6 +2,8 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { getUserRole } from '@/lib/auth-helpers';
+import type { Campaign } from '@/lib/types';
+import { getSponsorCampaigns } from './actions';
 import { CampaignList } from './components/campaign-list';
 
 export default async function SponsorDashboard() {
@@ -14,9 +16,21 @@ export default async function SponsorDashboard() {
   }
 
   // Verify user has 'sponsor' role
-  const roleData = await getUserRole(session.user.id);
+  const roleData = await getUserRole(session.user.id, { throwOnUnavailable: true });
   if (roleData.role !== 'sponsor') {
     redirect('/');
+  }
+
+  // Fetch campaigns on the server before rendering.
+  let campaigns: Campaign[] = [];
+  let campaignError: string | null = null;
+
+  if (roleData.sponsorId) {
+    try {
+      campaigns = await getSponsorCampaigns(roleData.sponsorId);
+    } catch {
+      campaignError = 'Failed to load campaigns';
+    }
   }
 
   return (
@@ -26,7 +40,8 @@ export default async function SponsorDashboard() {
         {/* TODO: Add CreateCampaignButton here */}
       </div>
 
-      <CampaignList />
+      <CampaignList campaigns={campaigns} error={campaignError} />
     </div>
   );
 }
+
