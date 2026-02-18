@@ -111,6 +111,46 @@ export const analytics = {
   bookingFail: (slotId: string, slotName: string, error: string) =>
     track('booking_fail', { slot_id: slotId, slot_name: slotName, error }),
 
+  quoteStart: (slotId: string, slotName: string, price: number) =>
+    track('quote_start', { slot_id: slotId, slot_name: slotName, price }),
+
+  quoteSubmit: (
+    slotId: string,
+    slotName: string,
+    price: number,
+    metadata: {
+      hasCompany: boolean;
+      hasPhone: boolean;
+      hasBudget: boolean;
+      hasGoals: boolean;
+      hasTimeline: boolean;
+      messageLength: number;
+      hasAttachments?: boolean;
+      attachmentCount?: number;
+      isLoggedIn?: boolean;
+    }
+  ) =>
+    track('quote_submit', {
+      slot_id: slotId,
+      slot_name: slotName,
+      price,
+      has_company: metadata.hasCompany,
+      has_phone: metadata.hasPhone,
+      has_budget: metadata.hasBudget,
+      has_goals: metadata.hasGoals,
+      has_timeline: metadata.hasTimeline,
+      message_length: metadata.messageLength,
+      ...(typeof metadata.hasAttachments === 'boolean' && { has_attachments: metadata.hasAttachments }),
+      ...(typeof metadata.attachmentCount === 'number' && { attachment_count: metadata.attachmentCount }),
+      ...(typeof metadata.isLoggedIn === 'boolean' && { is_logged_in: metadata.isLoggedIn }),
+    }),
+
+  quoteSuccess: (slotId: string, slotName: string, price: number, quoteId: string) =>
+    track('quote_success', { slot_id: slotId, slot_name: slotName, price, quote_id: quoteId }),
+
+  quoteFail: (slotId: string, slotName: string, error: string) =>
+    track('quote_fail', { slot_id: slotId, slot_name: slotName, error }),
+
   filterApply: (filterType: string, filterValue: string) =>
     track('filter_apply', { filter_type: filterType, filter_value: filterValue }),
 

@@ -15,7 +15,7 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json());
+app.use(express.json({ limit: '20mb' }));
 
 // Mount all API routes
 app.use('/api', routes);

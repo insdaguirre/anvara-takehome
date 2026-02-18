@@ -7,6 +7,7 @@ import { authClient } from '@/auth-client';
 import { analytics } from '@/lib/analytics';
 import { formatCompactNumber, formatPrice } from '@/lib/format';
 import { BookingModal } from './booking-modal';
+import { QuoteModal } from './quote-modal';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4291';
 
@@ -69,7 +70,10 @@ export function AdSlotDetail({ id }: Props) {
   const [roleInfo, setRoleInfo] = useState<RoleInfo | null>(null);
   const [roleLoading, setRoleLoading] = useState(true);
   const [bookingSuccess, setBookingSuccess] = useState(false);
+  const [quoteSuccess, setQuoteSuccess] = useState(false);
+  const [quoteRequestId, setQuoteRequestId] = useState<string | null>(null);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [isQuoteModalOpen, setIsQuoteModalOpen] = useState(false);
   const [returnFocusElement, setReturnFocusElement] = useState<HTMLElement | null>(null);
   const [resetting, setResetting] = useState(false);
   const hasTrackedListingView = useRef(false);
@@ -117,9 +121,20 @@ export function AdSlotDetail({ id }: Props) {
     setIsBookingModalOpen(true);
   };
 
+  const handleOpenQuoteModal = (event: MouseEvent<HTMLElement>) => {
+    if (!adSlot || !adSlot.isAvailable) return;
+    setReturnFocusElement(event.currentTarget);
+    setIsQuoteModalOpen(true);
+  };
+
   const handleBookingSuccess = () => {
     setBookingSuccess(true);
     setAdSlot((current) => (current ? { ...current, isAvailable: false } : current));
+  };
+
+  const handleQuoteSuccess = (quoteId: string) => {
+    setQuoteSuccess(true);
+    setQuoteRequestId(quoteId);
   };
 
   const handleUnbook = async () => {
@@ -170,11 +185,15 @@ export function AdSlotDetail({ id }: Props) {
 
   const canBook = adSlot.isAvailable && roleInfo?.role === 'sponsor' && Boolean(roleInfo?.sponsorId);
   const shouldShowLogin = adSlot.isAvailable && !roleLoading && !user;
+  const isPublisherViewer = !roleLoading && roleInfo?.role === 'publisher';
   const isPublisherRole = adSlot.isAvailable && !roleLoading && roleInfo?.role === 'publisher';
   const isUnknownRole = adSlot.isAvailable && !roleLoading && user && roleInfo?.role !== 'sponsor';
+  const canRequestQuote = adSlot.isAvailable && (!user || !roleLoading) && !isPublisherViewer;
 
   const ctaClassName =
     'inline-flex w-full items-center justify-center rounded-lg px-4 py-3 font-semibold transition-colors';
+  const secondaryCtaClassName =
+    'inline-flex w-full items-center justify-center rounded-lg border border-[var(--color-primary)] px-4 py-3 font-semibold text-[var(--color-primary)] transition-colors hover:bg-[var(--color-primary)]/10';
 
   return (
     <div className="space-y-6 pb-24 lg:pb-0">
@@ -252,6 +271,41 @@ export function AdSlotDetail({ id }: Props) {
                   {resetting ? 'Resetting...' : 'Reset booking (development only)'}
                 </button>
               )}
+            </section>
+          )}
+
+          {quoteSuccess && (
+            <section className="rounded-xl border border-blue-200 bg-blue-50 p-6">
+              <h2 className="text-lg font-semibold text-blue-800">Quote Request Submitted!</h2>
+              <p className="mt-2 text-sm text-blue-700">What happens next:</p>
+              <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-blue-700">
+                <li>Our team reviews your request and listing details.</li>
+                <li>You&apos;ll receive a tailored quote with next steps by email.</li>
+                <li>Approve when ready and we&apos;ll coordinate launch timing.</li>
+              </ol>
+
+              {quoteRequestId && (
+                <p className="mt-3 text-sm text-blue-700">
+                  Reference ID: <span className="font-semibold">{quoteRequestId}</span>
+                </p>
+              )}
+
+              <div className="mt-4 flex flex-wrap gap-4">
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    setQuoteSuccess(false);
+                    setQuoteRequestId(null);
+                    handleOpenQuoteModal(event);
+                  }}
+                  className="text-sm font-medium text-blue-800 hover:underline"
+                >
+                  Request Another Quote
+                </button>
+                <Link href="/marketplace" className="text-sm font-medium text-blue-800 hover:underline">
+                  Back to Marketplace
+                </Link>
+              </div>
             </section>
           )}
 
@@ -357,7 +411,7 @@ export function AdSlotDetail({ id }: Props) {
               {adSlot.isAvailable ? '● Available' : '○ Currently Booked'}
             </p>
 
-            <div>
+            <div className="space-y-2">
               {!adSlot.isAvailable ? (
                 <button
                   type="button"
@@ -406,6 +460,16 @@ export function AdSlotDetail({ id }: Props) {
                   Unavailable
                 </button>
               )}
+
+              {canRequestQuote && (
+                <button
+                  type="button"
+                  onClick={handleOpenQuoteModal}
+                  className={secondaryCtaClassName}
+                >
+                  Request a Quote
+                </button>
+              )}
             </div>
 
             <div className="space-y-2 border-t border-[var(--color-border)] pt-4 text-sm text-[var(--color-muted)]">
@@ -427,7 +491,7 @@ export function AdSlotDetail({ id }: Props) {
         </aside>
       </div>
 
-      {!bookingSuccess && (
+      {!bookingSuccess && !quoteSuccess && (
         <div className="fixed inset-x-0 bottom-0 z-50 border-t border-[var(--color-border)] bg-[var(--color-background)] px-4 py-3 shadow-lg lg:hidden">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
             <div>
@@ -435,46 +499,58 @@ export function AdSlotDetail({ id }: Props) {
               <p className="text-xs text-[var(--color-muted)]">per month</p>
             </div>
 
-            {!adSlot.isAvailable ? (
-              <button
-                type="button"
-                disabled
-                className={`${ctaClassName} w-auto cursor-not-allowed bg-gray-300 px-4 py-2 text-sm text-gray-600`}
-              >
-                Currently Booked
-              </button>
-            ) : roleLoading ? (
-              <button
-                type="button"
-                disabled
-                className={`${ctaClassName} w-auto cursor-not-allowed bg-gray-300 px-4 py-2 text-sm text-gray-600`}
-              >
-                Loading...
-              </button>
-            ) : canBook ? (
-              <button
-                type="button"
-                onClick={handleOpenModal}
-                className={`${ctaClassName} w-auto bg-[var(--color-primary)] px-4 py-2 text-sm text-white`}
-              >
-                Book This Placement
-              </button>
-            ) : shouldShowLogin ? (
-              <Link
-                href={loginHref}
-                className={`${ctaClassName} w-auto bg-[var(--color-primary)] px-4 py-2 text-sm text-white`}
-              >
-                Log in to Book
-              </Link>
-            ) : (
-              <button
-                type="button"
-                disabled
-                className={`${ctaClassName} w-auto cursor-not-allowed bg-gray-300 px-4 py-2 text-sm text-gray-600`}
-              >
-                Only sponsors can book
-              </button>
-            )}
+            <div className="flex w-full max-w-[16rem] flex-col gap-2 sm:w-auto sm:max-w-none sm:flex-row">
+              {!adSlot.isAvailable ? (
+                <button
+                  type="button"
+                  disabled
+                  className={`${ctaClassName} w-full cursor-not-allowed bg-gray-300 px-4 py-2 text-sm text-gray-600 sm:w-auto`}
+                >
+                  Currently Booked
+                </button>
+              ) : roleLoading ? (
+                <button
+                  type="button"
+                  disabled
+                  className={`${ctaClassName} w-full cursor-not-allowed bg-gray-300 px-4 py-2 text-sm text-gray-600 sm:w-auto`}
+                >
+                  Loading...
+                </button>
+              ) : canBook ? (
+                <button
+                  type="button"
+                  onClick={handleOpenModal}
+                  className={`${ctaClassName} w-full bg-[var(--color-primary)] px-4 py-2 text-sm text-white sm:w-auto`}
+                >
+                  Book This Placement
+                </button>
+              ) : shouldShowLogin ? (
+                <Link
+                  href={loginHref}
+                  className={`${ctaClassName} w-full bg-[var(--color-primary)] px-4 py-2 text-sm text-white sm:w-auto`}
+                >
+                  Log in to Book
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  disabled
+                  className={`${ctaClassName} w-full cursor-not-allowed bg-gray-300 px-4 py-2 text-sm text-gray-600 sm:w-auto`}
+                >
+                  Only sponsors can book
+                </button>
+              )}
+
+              {canRequestQuote && (
+                <button
+                  type="button"
+                  onClick={handleOpenQuoteModal}
+                  className={`${secondaryCtaClassName} w-full px-4 py-2 text-sm sm:w-auto`}
+                >
+                  Request a Quote
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -485,6 +561,17 @@ export function AdSlotDetail({ id }: Props) {
         onSuccess={handleBookingSuccess}
         adSlot={adSlot}
         sponsorName={sponsorName}
+        returnFocusElement={returnFocusElement}
+      />
+
+      <QuoteModal
+        isOpen={isQuoteModalOpen}
+        onClose={() => setIsQuoteModalOpen(false)}
+        onSuccess={handleQuoteSuccess}
+        adSlot={adSlot}
+        userEmail={user?.email}
+        companyName={sponsorName}
+        isLoggedIn={Boolean(user)}
         returnFocusElement={returnFocusElement}
       />
     </div>
