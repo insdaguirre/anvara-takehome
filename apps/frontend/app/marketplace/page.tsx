@@ -9,9 +9,10 @@ export default function MarketplacePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Marketplace</h1>
-        <p className="text-[var(--color-muted)]">Browse available ad slots from our publishers</p>
-        {/* TODO: Add search input and filter controls */}
+        <h1 className="text-2xl font-bold">Find the perfect ad placement for your brand</h1>
+        <p className="text-[var(--color-muted)]">
+          Compare publishers, audience reach, and pricing to book your next campaign.
+        </p>
       </div>
 
       <AdSlotGrid />

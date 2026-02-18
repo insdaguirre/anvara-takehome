@@ -17,7 +17,17 @@ router.get('/ad-slots', async (req: Request, res: Response) => {
         ...(available === 'true' && { isAvailable: true }),
       },
       include: {
-        publisher: { select: { id: true, name: true, category: true, monthlyViews: true } },
+        publisher: {
+          select: {
+            id: true,
+            name: true,
+            website: true,
+            category: true,
+            monthlyViews: true,
+            subscriberCount: true,
+            isVerified: true,
+          },
+        },
         _count: { select: { placements: true } },
       },
       orderBy: { basePrice: 'desc' },
@@ -59,4 +69,3 @@ router.get('/ad-slots/:id', async (req: Request, res: Response) => {
 });
 
 export default router;
-
