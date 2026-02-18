@@ -8,6 +8,7 @@ import placementsRoutes from './placements.js';
 import dashboardRoutes from './dashboard.js';
 import healthRoutes from './health.js';
 import marketplaceRoutes from './marketplace.js';
+import newsletterRoutes from './newsletter.js';
 
 const router: IRouter = Router();
 
@@ -21,5 +22,6 @@ router.use('/marketplace', marketplaceRoutes);
 router.use('/placements', placementsRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/health', healthRoutes);
+router.use('/newsletter', newsletterRoutes);
 
 export default router;
