@@ -8,7 +8,7 @@ export interface Campaign {
   description?: string;
   budget: number;
   spent: number;
-  status: 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'COMPLETED';
+  status: 'DRAFT' | 'PENDING_REVIEW' | 'APPROVED' | 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';
   startDate: string;
   endDate: string;
   sponsorId: string;
@@ -19,7 +19,7 @@ export interface AdSlot {
   id: string;
   name: string;
   description?: string;
-  type: 'DISPLAY' | 'VIDEO' | 'NEWSLETTER' | 'PODCAST';
+  type: 'DISPLAY' | 'VIDEO' | 'NATIVE' | 'NEWSLETTER' | 'PODCAST';
   basePrice: number;
   isAvailable: boolean;
   publisherId: string;

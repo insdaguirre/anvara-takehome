@@ -145,13 +145,13 @@ export function AdSlotDetail({ id }: Props) {
   };
 
   if (loading) {
-    return <div className="py-12 text-center text-[--color-muted]">Loading...</div>;
+    return <div className="py-12 text-center text-[var(--color-muted)]">Loading...</div>;
   }
 
   if (error || !adSlot) {
     return (
       <div className="space-y-4">
-        <Link href="/marketplace" className="text-[--color-primary] hover:underline">
+        <Link href="/marketplace" className="text-[var(--color-primary)] hover:underline">
           ← Back to Marketplace
         </Link>
         <div className="rounded border border-red-200 bg-red-50 p-4 text-red-600">
@@ -163,16 +163,16 @@ export function AdSlotDetail({ id }: Props) {
 
   return (
     <div className="space-y-6">
-      <Link href="/marketplace" className="text-[--color-primary] hover:underline">
+      <Link href="/marketplace" className="text-[var(--color-primary)] hover:underline">
         ← Back to Marketplace
       </Link>
 
-      <div className="rounded-lg border border-[--color-border] p-6">
+      <div className="rounded-lg border border-[var(--color-border)] p-6">
         <div className="mb-4 flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold">{adSlot.name}</h1>
             {adSlot.publisher && (
-              <p className="text-[--color-muted]">
+              <p className="text-[var(--color-muted)]">
                 by {adSlot.publisher.name}
                 {adSlot.publisher.website && (
                   <>
@@ -182,7 +182,7 @@ export function AdSlotDetail({ id }: Props) {
                       href={adSlot.publisher.website}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-[--color-primary] hover:underline"
+                      className="text-[var(--color-primary)] hover:underline"
                     >
                       {adSlot.publisher.website}
                     </a>
@@ -196,50 +196,50 @@ export function AdSlotDetail({ id }: Props) {
           </span>
         </div>
 
-        {adSlot.description && <p className="mb-6 text-[--color-muted]">{adSlot.description}</p>}
+        {adSlot.description && <p className="mb-6 text-[var(--color-muted)]">{adSlot.description}</p>}
 
-        <div className="flex items-center justify-between border-t border-[--color-border] pt-4">
+        <div className="flex items-center justify-between border-t border-[var(--color-border)] pt-4">
           <div>
             <span
-              className={`text-sm font-medium ${adSlot.isAvailable ? 'text-green-600' : 'text-[--color-muted]'}`}
+              className={`text-sm font-medium ${adSlot.isAvailable ? 'text-green-600' : 'text-[var(--color-muted)]'}`}
             >
               {adSlot.isAvailable ? '● Available' : '○ Currently Booked'}
             </span>
             {!adSlot.isAvailable && !bookingSuccess && (
               <button
                 onClick={handleUnbook}
-                className="ml-3 text-sm text-[--color-primary] underline hover:opacity-80"
+                className="ml-3 text-sm text-[var(--color-primary)] underline hover:opacity-80"
               >
                 Reset listing
               </button>
             )}
           </div>
           <div className="text-right">
-            <p className="text-2xl font-bold text-[--color-primary]">
+            <p className="text-2xl font-bold text-[var(--color-primary)]">
               ${Number(adSlot.basePrice).toLocaleString()}
             </p>
-            <p className="text-sm text-[--color-muted]">per month</p>
+            <p className="text-sm text-[var(--color-muted)]">per month</p>
           </div>
         </div>
 
         {adSlot.isAvailable && !bookingSuccess && (
-          <div className="mt-6 border-t border-[--color-border] pt-6">
+          <div className="mt-6 border-t border-[var(--color-border)] pt-6">
             <h2 className="mb-4 text-lg font-semibold">Request This Placement</h2>
 
             {roleLoading ? (
-              <div className="py-4 text-center text-[--color-muted]">Loading...</div>
+              <div className="py-4 text-center text-[var(--color-muted)]">Loading...</div>
             ) : roleInfo?.role === 'sponsor' && roleInfo?.sponsorId ? (
               <div className="space-y-4">
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-[--color-muted]">
+                  <label className="mb-1 block text-sm font-medium text-[var(--color-muted)]">
                     Your Company
                   </label>
-                  <p className="text-[--color-foreground]">{roleInfo.name || user?.name}</p>
+                  <p className="text-[var(--color-foreground)]">{roleInfo.name || user?.name}</p>
                 </div>
                 <div>
                   <label
                     htmlFor="message"
-                    className="mb-1 block text-sm font-medium text-[--color-muted]"
+                    className="mb-1 block text-sm font-medium text-[var(--color-muted)]"
                   >
                     Message to Publisher (optional)
                   </label>
@@ -248,7 +248,7 @@ export function AdSlotDetail({ id }: Props) {
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     placeholder="Tell the publisher about your campaign goals..."
-                    className="w-full rounded-lg border border-[--color-border] bg-[--color-background] px-3 py-2 text-[--color-foreground] placeholder:text-[--color-muted] focus:border-[--color-primary] focus:outline-none focus:ring-1 focus:ring-[--color-primary]"
+                    className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-[var(--color-foreground)] placeholder:text-[var(--color-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
                     rows={3}
                   />
                 </div>
@@ -256,7 +256,7 @@ export function AdSlotDetail({ id }: Props) {
                 <button
                   onClick={handleBooking}
                   disabled={booking}
-                  className="w-full rounded-lg bg-[--color-primary] px-4 py-3 font-semibold text-white transition-colors hover:opacity-90 disabled:opacity-50"
+                  className="w-full rounded-lg bg-[var(--color-primary)] px-4 py-3 font-semibold text-white transition-colors hover:opacity-90 disabled:opacity-50"
                 >
                   {booking ? 'Booking...' : 'Book This Placement'}
                 </button>
@@ -269,7 +269,7 @@ export function AdSlotDetail({ id }: Props) {
                 >
                   Request This Placement
                 </button>
-                <p className="mt-2 text-center text-sm text-[--color-muted]">
+                <p className="mt-2 text-center text-sm text-[var(--color-muted)]">
                   {user
                     ? 'Only sponsors can request placements'
                     : 'Log in as a sponsor to request this placement'}

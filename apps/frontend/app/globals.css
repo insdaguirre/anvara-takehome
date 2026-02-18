@@ -56,8 +56,8 @@ body {
 }
 
 /*
- * HINT: Use Tailwind v4 arbitrary values with CSS vars:
- * - bg-[--color-primary] for custom backgrounds
- * - text-[--color-foreground] for custom text colors
- * - p-[--spacing-container] for custom spacing
+ * HINT: Use Tailwind arbitrary values with explicit CSS vars:
+ * - bg-[var(--color-primary)] for custom backgrounds
+ * - text-[var(--color-foreground)] for custom text colors
+ * - p-[var(--spacing-container)] for custom spacing
  */

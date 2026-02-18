@@ -17,7 +17,7 @@ export function CampaignList({ campaigns, error }: CampaignListProps) {
 
   if (campaigns.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-[--color-border] p-8 text-center text-[--color-muted]">
+      <div className="rounded-lg border border-dashed border-[var(--color-border)] p-8 text-center text-[var(--color-muted)]">
         No campaigns yet. Create your first campaign to get started.
       </div>
     );
