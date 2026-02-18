@@ -2,9 +2,9 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { getUserRole } from '@/lib/auth-helpers';
-import { getAdSlots } from '@/lib/api';
 import type { AdSlot } from '@/lib/types';
 import { AdSlotList } from './components/ad-slot-list';
+import { getPublisherAdSlots } from './actions';
 
 export default async function PublisherDashboard() {
   const session = await auth.api.getSession({
@@ -27,7 +27,7 @@ export default async function PublisherDashboard() {
 
   if (roleData.publisherId) {
     try {
-      adSlots = await getAdSlots(roleData.publisherId);
+      adSlots = await getPublisherAdSlots();
     } catch {
       adSlotError = 'Failed to load ad slots';
     }

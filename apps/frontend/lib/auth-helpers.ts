@@ -26,6 +26,7 @@ export async function getUserRole(
   try {
     const res = await fetch(`${API_URL}/api/auth/role/${userId}`, {
       cache: 'no-store', // Always fetch fresh role data
+      credentials: 'include',
     });
     if (!res.ok) {
       if (throwOnUnavailable && res.status >= 500) {

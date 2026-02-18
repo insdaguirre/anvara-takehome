@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { getAdSlots } from '@/lib/api';
+import { getMarketplaceAdSlots } from '@/lib/api';
 
 const typeColors: Record<string, string> = {
   DISPLAY: 'bg-blue-100 text-blue-700',
@@ -17,7 +17,7 @@ export function AdSlotGrid() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    getAdSlots()
+    getMarketplaceAdSlots()
       .then(setAdSlots)
       .catch(() => setError('Failed to load ad slots'))
       .finally(() => setLoading(false));

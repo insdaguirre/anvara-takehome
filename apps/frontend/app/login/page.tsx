@@ -37,7 +37,9 @@ export default function LoginPage() {
           try {
             const userId = ctx.data?.user?.id;
             if (userId) {
-              const roleRes = await fetch(`${API_URL}/api/auth/role/${userId}`);
+              const roleRes = await fetch(`${API_URL}/api/auth/role/${userId}`, {
+                credentials: 'include',
+              });
               const roleData = await roleRes.json();
               if (roleData.role === 'sponsor') {
                 router.push('/dashboard/sponsor');

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { getAdSlot } from '@/lib/api';
+import { getMarketplaceAdSlot } from '@/lib/api';
 import { authClient } from '@/auth-client';
 
 interface AdSlot {
@@ -57,7 +57,7 @@ export function AdSlotDetail({ id }: Props) {
 
   useEffect(() => {
     // Fetch ad slot
-    getAdSlot(id)
+    getMarketplaceAdSlot(id)
       .then(setAdSlot)
       .catch(() => setError('Failed to load ad slot details'))
       .finally(() => setLoading(false));
@@ -72,7 +72,8 @@ export function AdSlotDetail({ id }: Props) {
 
           // Fetch role info from backend
           fetch(
-            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4291'}/api/auth/role/${sessionUser.id}`
+            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4291'}/api/auth/role/${sessionUser.id}`,
+            { credentials: 'include' }
           )
             .then((res) => res.json())
             .then((data) => setRoleInfo(data))
@@ -97,8 +98,8 @@ export function AdSlotDetail({ id }: Props) {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({
-            sponsorId: roleInfo.sponsorId,
             message: message || undefined,
           }),
         }
@@ -127,6 +128,7 @@ export function AdSlotDetail({ id }: Props) {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
         }
       );
 

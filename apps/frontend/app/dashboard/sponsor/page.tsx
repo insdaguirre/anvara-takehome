@@ -27,7 +27,7 @@ export default async function SponsorDashboard() {
 
   if (roleData.sponsorId) {
     try {
-      campaigns = await getSponsorCampaigns(roleData.sponsorId);
+      campaigns = await getSponsorCampaigns();
     } catch {
       campaignError = 'Failed to load campaigns';
     }
@@ -44,4 +44,3 @@ export default async function SponsorDashboard() {
     </div>
   );
 }
-
