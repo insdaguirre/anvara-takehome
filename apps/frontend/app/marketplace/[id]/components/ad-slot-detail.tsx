@@ -74,6 +74,7 @@ export function AdSlotDetail({ id }: Props) {
   const [quoteRequestId, setQuoteRequestId] = useState<string | null>(null);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [isQuoteModalOpen, setIsQuoteModalOpen] = useState(false);
+  const [isFooterVisible, setIsFooterVisible] = useState(false);
   const [returnFocusElement, setReturnFocusElement] = useState<HTMLElement | null>(null);
   const [resetting, setResetting] = useState(false);
   const hasTrackedListingView = useRef(false);
@@ -115,6 +116,76 @@ export function AdSlotDetail({ id }: Props) {
       Boolean(adSlot.isAvailable)
     );
   }, [adSlot]);
+
+  useEffect(() => {
+    const slotId = adSlot?.id;
+    if (!slotId) return;
+
+    const viewStartTime = Date.now();
+    let hasTrackedScrollDepth = false;
+    let hasTrackedViewDuration = false;
+
+    const trackViewDuration = () => {
+      if (hasTrackedViewDuration) return;
+      const durationSeconds = Math.floor((Date.now() - viewStartTime) / 1000);
+      if (durationSeconds < 10) return;
+      hasTrackedViewDuration = true;
+      analytics.listingViewDuration(slotId, durationSeconds);
+    };
+
+    const handleScroll = () => {
+      if (hasTrackedScrollDepth) return;
+
+      const scrollableHeight = document.documentElement.scrollHeight - window.innerHeight;
+      if (scrollableHeight <= 0) return;
+
+      const currentScroll = window.scrollY || document.documentElement.scrollTop;
+      const scrollPercent = (currentScroll / scrollableHeight) * 100;
+
+      if (scrollPercent >= 50) {
+        hasTrackedScrollDepth = true;
+        analytics.listingScrollDepth(slotId, 50);
+        window.removeEventListener('scroll', handleScroll);
+      }
+    };
+
+    const handlePageHide = () => {
+      trackViewDuration();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        trackViewDuration();
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('pagehide', handlePageHide);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    handleScroll();
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('pagehide', handlePageHide);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      trackViewDuration();
+    };
+  }, [adSlot?.id]);
+
+  useEffect(() => {
+    const footer = document.querySelector('footer');
+    if (!footer || typeof IntersectionObserver === 'undefined') return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        setIsFooterVisible(entries[0]?.isIntersecting ?? false);
+      },
+      { threshold: 0.01 }
+    );
+
+    observer.observe(footer);
+    return () => observer.disconnect();
+  }, []);
 
   const handleOpenModal = (event: MouseEvent<HTMLElement>) => {
     setReturnFocusElement(event.currentTarget);
@@ -491,7 +562,7 @@ export function AdSlotDetail({ id }: Props) {
         </aside>
       </div>
 
-      {!bookingSuccess && !quoteSuccess && (
+      {!bookingSuccess && !quoteSuccess && !isFooterVisible && (
         <div className="fixed inset-x-0 bottom-0 z-50 border-t border-[var(--color-border)] bg-[var(--color-background)] px-4 py-3 shadow-lg lg:hidden">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
             <div>

@@ -61,6 +61,7 @@ export async function subscribeToNewsletter(
     if (!response.ok) {
       const errorMessage = await parseApiError(response, 'Failed to subscribe to newsletter');
       return {
+        error: errorMessage,
         fieldErrors: { email: errorMessage },
         values: { email },
         resetKey: prevState.resetKey ?? 0,

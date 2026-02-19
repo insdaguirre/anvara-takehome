@@ -150,34 +150,34 @@ pnpm --filter @anvara/backend db:studio
 
 ### Publisher Dashboard
 
-- [ ] Can view all ad slots
-- [ ] Can create new ad slot with form
-- [ ] Can edit existing ad slot
-- [ ] Can delete ad slot with confirmation
-- [ ] Loading states display during operations ("Saving...", "Deleting...")
-- [ ] Validation errors show for empty/invalid fields
-- [ ] Forms close after successful submission
-- [ ] Data refreshes automatically after mutations
-- [ ] Server errors display correctly
+- [x] Can view all ad slots
+- [x] Can create new ad slot with form
+- [x] Can edit existing ad slot
+- [x] Can delete ad slot with confirmation
+- [x] Loading states display during operations ("Saving...", "Deleting...")
+- [x] Validation errors show for empty/invalid fields
+- [x] Forms close after successful submission
+- [x] Data refreshes automatically after mutations
+- [x] Server errors display correctly
 
 ### Sponsor Dashboard
 
-- [ ] Can view all campaigns
-- [ ] Can create new campaign
-- [ ] Can edit existing campaign
-- [ ] Can delete campaign
-- [ ] Date inputs work correctly
-- [ ] Budget validation works
-- [ ] All CRUD operations refresh data properly
+- [x] Can view all campaigns
+- [x] Can create new campaign
+- [x] Can edit existing campaign
+- [x] Can delete campaign
+- [x] Date inputs work correctly
+- [x] Budget validation works
+- [x] All CRUD operations refresh data properly
 
 ### Both Dashboards
 
-- [ ] Proper authentication (redirects if not logged in)
-- [ ] No console errors
-- [ ] Form state managed correctly with `useFormState`
-- [ ] Submit buttons show pending state with `useFormStatus`
-- [ ] Error messages are user-friendly
-- [ ] Success feedback is clear
+- [x] Proper authentication (redirects if not logged in)
+- [x] No console errors
+- [x] Form state managed correctly with `useFormState`
+- [x] Submit buttons show pending state with `useFormStatus`
+- [x] Error messages are user-friendly
+- [x] Success feedback is clear
 
 ## Resources
 

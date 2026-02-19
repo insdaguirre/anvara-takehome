@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef } from 'react';
 import { useFormStatus } from 'react-dom';
+import { analytics } from '@/lib/analytics';
 import {
   subscribeToNewsletter,
   type NewsletterSignupState,
@@ -28,6 +29,9 @@ function NewsletterSubmitButton() {
 
 export function Footer() {
   const formRef = useRef<HTMLFormElement | null>(null);
+  const hasTrackedNewsletterStart = useRef(false);
+  const previousSuccess = useRef(false);
+  const previousError = useRef<string | undefined>(undefined);
   const [state, formAction] = useActionState(
     subscribeToNewsletter,
     INITIAL_NEWSLETTER_SIGNUP_STATE
@@ -38,6 +42,35 @@ export function Footer() {
       formRef.current?.reset();
     }
   }, [state.success, state.resetKey]);
+
+  useEffect(() => {
+    if (state.success && !previousSuccess.current) {
+      analytics.newsletterSignupSuccess();
+    }
+    previousSuccess.current = Boolean(state.success);
+  }, [state.success]);
+
+  useEffect(() => {
+    if (state.error && state.error !== previousError.current) {
+      analytics.newsletterSignupFail(state.error);
+    }
+    previousError.current = state.error;
+  }, [state.error]);
+
+  const handleNewsletterStart = () => {
+    if (hasTrackedNewsletterStart.current) return;
+    hasTrackedNewsletterStart.current = true;
+    analytics.newsletterSignupStart();
+  };
+
+  const handleNewsletterSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    const formData = new FormData(event.currentTarget);
+    const rawEmail = formData.get('email');
+    const email = typeof rawEmail === 'string' ? rawEmail.trim().toLowerCase() : '';
+    const atIndex = email.lastIndexOf('@');
+    const emailDomain = atIndex > -1 ? email.slice(atIndex + 1) : 'unknown';
+    analytics.newsletterSignupSubmit(emailDomain || 'unknown');
+  };
 
   return (
     <footer className="border-t border-[var(--color-border)] bg-[var(--color-background)]">
@@ -54,6 +87,7 @@ export function Footer() {
         <form
           ref={formRef}
           action={formAction}
+          onSubmit={handleNewsletterSubmit}
           className="flex w-full max-w-md flex-col gap-2"
           aria-describedby="newsletter-form-status"
         >
@@ -72,6 +106,7 @@ export function Footer() {
               aria-invalid={Boolean(state.fieldErrors?.email)}
               aria-describedby={state.fieldErrors?.email ? 'newsletter-email-error' : undefined}
               defaultValue={state.values?.email ?? ''}
+              onFocus={handleNewsletterStart}
               className="w-full rounded border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-foreground)] placeholder:text-[var(--color-muted)]"
             />
             <NewsletterSubmitButton />

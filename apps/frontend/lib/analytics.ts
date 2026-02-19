@@ -1,3 +1,5 @@
+import { sendGA4Event } from './ga4-bridge';
+
 type EventPropertyValue = string | number | boolean | null;
 type EventProperties = Record<string, EventPropertyValue>;
 
@@ -67,6 +69,16 @@ export function track(event: string, properties: EventProperties = {}): void {
     console.log(`[Analytics] ${event}`, analyticsEvent.properties);
   }
 
+  const ga4Properties = Object.fromEntries(
+    Object.entries(analyticsEvent.properties).filter(
+      (entry): entry is [string, string | number | boolean] => {
+        const value = entry[1];
+        return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
+      }
+    )
+  );
+
+  sendGA4Event(event, ga4Properties);
   eventQueue.push(analyticsEvent);
 }
 
@@ -156,6 +168,27 @@ export const analytics = {
 
   searchQuery: (query: string, resultCount: number) =>
     track('search_query', { query, result_count: resultCount }),
+
+  newsletterSignupStart: () => track('newsletter_signup_start'),
+
+  newsletterSignupSubmit: (emailDomain: string) =>
+    track('newsletter_signup_submit', { email_domain: emailDomain }),
+
+  newsletterSignupSuccess: () => track('newsletter_signup_success'),
+
+  newsletterSignupFail: (error: string) => track('newsletter_signup_fail', { error }),
+
+  navigation: (fromPage: string, toPage: string, navigationType: 'spa_route_change') =>
+    track('navigation', { from_page: fromPage, to_page: toPage, navigation_type: navigationType }),
+
+  marketplaceToDetailNavigation: (listingId: string) =>
+    track('marketplace_to_detail_navigation', { listing_id: listingId }),
+
+  listingScrollDepth: (slotId: string, depth: number) =>
+    track('listing_scroll_depth', { slot_id: slotId, depth_percent: depth }),
+
+  listingViewDuration: (slotId: string, durationSeconds: number) =>
+    track('listing_view_duration', { slot_id: slotId, duration_seconds: durationSeconds }),
 };
 
 export { eventQueue };
