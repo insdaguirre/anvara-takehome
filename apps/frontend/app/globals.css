@@ -22,6 +22,12 @@
   --color-foreground: #0f172a;
   --color-muted: #64748b;
   --color-border: #e2e8f0;
+  --landing-overlay-rgb: 255 255 255;
+  --landing-support-text-rgb: 255 255 255;
+  --landing-feature-label-rgb: 99 102 241;
+  --marketplace-overlay-rgb: 255 255 255;
+  --nav-dark-accent: #0a2455;
+  --nav-dark-accent-rgb: 10 36 85;
 
   /* Status colors */
   --color-success: #22c55e;
@@ -32,14 +38,29 @@
   --spacing-container: 1rem;
 }
 
-/* Dark mode support - TODO: Implement dark mode toggle */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-background: #0f172a;
-    --color-foreground: #f8fafc;
-    --color-muted: #94a3b8;
-    --color-border: #334155;
-  }
+/* Light mode - Explicit definition for manual toggle */
+html.light,
+html:not(.dark) {
+  --color-background: #ffffff;
+  --color-foreground: #0f172a;
+  --color-muted: #64748b;
+  --color-border: #e2e8f0;
+  --landing-overlay-rgb: 255 255 255;
+  --landing-support-text-rgb: 203 213 225;
+  --landing-feature-label-rgb: 99 102 241;
+  --marketplace-overlay-rgb: 255 255 255;
+}
+
+/* Dark mode support - Manual toggle with localStorage persistence */
+html.dark {
+  --color-background: #0f172a;
+  --color-foreground: #f8fafc;
+  --color-muted: #94a3b8;
+  --color-border: #334155;
+  --landing-overlay-rgb: 0 0 0;
+  --landing-support-text-rgb: 148 163 184;
+  --landing-feature-label-rgb: 148 163 184;
+  --marketplace-overlay-rgb: 0 0 0;
 }
 
 /* Base styles */
@@ -53,6 +74,71 @@ body {
     'Segoe UI',
     Roboto,
     sans-serif;
+}
+
+.nav-link-inactive {
+  transition:
+    color 200ms ease,
+    text-shadow 200ms ease;
+}
+
+.nav-link-active {
+  font-weight: 600;
+}
+
+html.light .nav-link-active,
+html:not(.dark) .nav-link-active {
+  color: var(--color-primary);
+}
+
+html.light .nav-link-inactive,
+html:not(.dark) .nav-link-inactive {
+  color: var(--color-foreground);
+}
+
+html.light .nav-link-inactive:hover,
+html:not(.dark) .nav-link-inactive:hover {
+  color: var(--color-primary);
+  text-shadow:
+    0 0 10px rgb(99 102 241 / 0.55),
+    0 0 20px rgb(99 102 241 / 0.35);
+}
+
+html.dark .nav-link-inactive {
+  color: #ffffff;
+}
+
+html.dark .nav-link-inactive:hover {
+  color: var(--nav-dark-accent);
+  text-shadow:
+    0 0 10px rgb(var(--nav-dark-accent-rgb) / 0.6),
+    0 0 20px rgb(var(--nav-dark-accent-rgb) / 0.4);
+}
+
+html.dark .nav-link-active {
+  color: var(--nav-dark-accent);
+}
+
+@keyframes dashboard-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes dashboard-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 /*

@@ -11,7 +11,7 @@ export function HeroSection() {
         <h1 className="text-4xl font-bold leading-tight tracking-tight md:text-5xl lg:text-6xl">
           Connect Sponsors with the Right Publishers
         </h1>
-        <p className="mx-auto mt-6 max-w-2xl text-lg text-[var(--color-muted)] md:text-xl">
+        <p className="mx-auto mt-6 max-w-2xl text-lg text-[rgb(var(--landing-support-text-rgb))] md:text-xl">
           Anvara is the marketplace that makes sponsorship deals simple. Find your perfect match,
           negotiate terms, and launch campaigns — all in one place.
         </p>

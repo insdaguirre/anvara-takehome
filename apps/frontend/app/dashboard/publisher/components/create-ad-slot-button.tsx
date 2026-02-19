@@ -1,7 +1,9 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useFormStatus } from 'react-dom';
+import type { DashboardToastInput } from '../../components/use-dashboard-toasts';
 import { createAdSlot } from '../actions';
 import { INITIAL_AD_SLOT_FORM_STATE, type AdSlotFormState } from '../form-state';
 
@@ -14,61 +16,108 @@ function CreateAdSlotSubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+      className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[var(--color-primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
     >
-      {pending ? 'Saving...' : 'Create Ad Slot'}
+      {pending ? 'Creating...' : 'Create Ad Slot'}
     </button>
   );
 }
 
-export function CreateAdSlotButton() {
+interface CreateAdSlotButtonProps {
+  onToast(toast: DashboardToastInput): void;
+}
+
+export function CreateAdSlotButton({ onToast }: CreateAdSlotButtonProps) {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
-  const [flashMessage, setFlashMessage] = useState<string | null>(null);
+  const nameInputRef = useRef<HTMLInputElement | null>(null);
   const [state, formAction] = useActionState(async (prevState: AdSlotFormState, formData: FormData) => {
     const result = await createAdSlot(prevState, formData);
     if (result.success) {
       setIsOpen(false);
-      setFlashMessage('Ad slot created successfully.');
+      onToast({
+        tone: 'success',
+        title: 'Ad slot created',
+        message: 'Your new inventory listing is now live on this dashboard.',
+      });
+      router.refresh();
+    } else if (result.error) {
+      onToast({
+        tone: 'error',
+        title: 'Could not create ad slot',
+        message: result.error,
+      });
     }
     return result;
   }, INITIAL_AD_SLOT_FORM_STATE);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const timeout = window.setTimeout(() => {
+      nameInputRef.current?.focus();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [isOpen]);
+
+  const nameErrorId = 'create-ad-slot-name-error';
+  const descriptionErrorId = 'create-ad-slot-description-error';
+  const typeErrorId = 'create-ad-slot-type-error';
+  const basePriceErrorId = 'create-ad-slot-base-price-error';
+  const hasErrorBanner = Boolean(state.error);
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <button
         type="button"
         onClick={() => {
-          setFlashMessage(null);
           setIsOpen((current) => !current);
         }}
-        className="rounded bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
+        aria-expanded={isOpen}
+        aria-controls="create-ad-slot-form"
+        className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[var(--color-primary-hover)]"
       >
-        {isOpen ? 'Close Form' : 'Create Ad Slot'}
+        {isOpen ? 'Close Form' : 'New Ad Slot'}
       </button>
 
-      {flashMessage && <p className="text-sm text-green-600">{flashMessage}</p>}
-
       {isOpen && (
-        <form action={formAction} className="grid gap-3 rounded-lg border border-[var(--color-border)] p-4">
-          {state.error && (
-            <div className="rounded border border-red-200 bg-red-50 p-2 text-sm text-red-700">
+        <form
+          id="create-ad-slot-form"
+          action={formAction}
+          className="grid gap-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-5 shadow-sm motion-safe:animate-[dashboard-dialog-in_180ms_ease-out]"
+        >
+          {hasErrorBanner && (
+            <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-2 text-sm text-red-700">
               {state.error}
             </div>
           )}
 
           <div>
             <label htmlFor="create-ad-slot-name" className="block text-sm font-medium">
-              Name
+              Name <span className="text-red-600">*</span>
             </label>
             <input
+              ref={nameInputRef}
               id="create-ad-slot-name"
               name="name"
               type="text"
+              required
+              maxLength={120}
               defaultValue={state.values?.name ?? ''}
-              className="mt-1 w-full rounded border border-[var(--color-border)] px-3 py-2"
+              aria-invalid={Boolean(state.fieldErrors?.name)}
+              aria-describedby={state.fieldErrors?.name ? nameErrorId : undefined}
+              className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
+                state.fieldErrors?.name
+                  ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                  : 'border-[var(--color-border)] focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]'
+              }`}
             />
             {state.fieldErrors?.name && (
-              <p className="mt-1 text-sm text-red-600">{state.fieldErrors.name}</p>
+              <p id={nameErrorId} className="mt-1 text-sm text-red-600">
+                {state.fieldErrors.name}
+              </p>
             )}
           </div>
 
@@ -81,10 +130,19 @@ export function CreateAdSlotButton() {
               name="description"
               rows={3}
               defaultValue={state.values?.description ?? ''}
-              className="mt-1 w-full rounded border border-[var(--color-border)] px-3 py-2"
+              maxLength={1000}
+              aria-invalid={Boolean(state.fieldErrors?.description)}
+              aria-describedby={state.fieldErrors?.description ? descriptionErrorId : undefined}
+              className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
+                state.fieldErrors?.description
+                  ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                  : 'border-[var(--color-border)] focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]'
+              }`}
             />
             {state.fieldErrors?.description && (
-              <p className="mt-1 text-sm text-red-600">{state.fieldErrors.description}</p>
+              <p id={descriptionErrorId} className="mt-1 text-sm text-red-600">
+                {state.fieldErrors.description}
+              </p>
             )}
           </div>
 
@@ -96,7 +154,13 @@ export function CreateAdSlotButton() {
               id="create-ad-slot-type"
               name="type"
               defaultValue={state.values?.type ?? 'DISPLAY'}
-              className="mt-1 w-full rounded border border-[var(--color-border)] px-3 py-2"
+              aria-invalid={Boolean(state.fieldErrors?.type)}
+              aria-describedby={state.fieldErrors?.type ? typeErrorId : undefined}
+              className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
+                state.fieldErrors?.type
+                  ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                  : 'border-[var(--color-border)] focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]'
+              }`}
             >
               {AD_SLOT_TYPES.map((slotType) => (
                 <option key={slotType} value={slotType}>
@@ -105,25 +169,36 @@ export function CreateAdSlotButton() {
               ))}
             </select>
             {state.fieldErrors?.type && (
-              <p className="mt-1 text-sm text-red-600">{state.fieldErrors.type}</p>
+              <p id={typeErrorId} className="mt-1 text-sm text-red-600">
+                {state.fieldErrors.type}
+              </p>
             )}
           </div>
 
           <div>
             <label htmlFor="create-ad-slot-base-price" className="block text-sm font-medium">
-              Base Price (monthly)
+              Base Price (monthly) <span className="text-red-600">*</span>
             </label>
             <input
               id="create-ad-slot-base-price"
               name="basePrice"
               type="number"
-              min="0"
+              required
+              min="0.01"
               step="0.01"
               defaultValue={state.values?.basePrice ?? ''}
-              className="mt-1 w-full rounded border border-[var(--color-border)] px-3 py-2"
+              aria-invalid={Boolean(state.fieldErrors?.basePrice)}
+              aria-describedby={state.fieldErrors?.basePrice ? basePriceErrorId : undefined}
+              className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
+                state.fieldErrors?.basePrice
+                  ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                  : 'border-[var(--color-border)] focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]'
+              }`}
             />
             {state.fieldErrors?.basePrice && (
-              <p className="mt-1 text-sm text-red-600">{state.fieldErrors.basePrice}</p>
+              <p id={basePriceErrorId} className="mt-1 text-sm text-red-600">
+                {state.fieldErrors.basePrice}
+              </p>
             )}
           </div>
 
@@ -132,7 +207,7 @@ export function CreateAdSlotButton() {
               name="isAvailable"
               type="checkbox"
               defaultChecked={state.values?.isAvailable ?? true}
-              className="h-4 w-4 rounded border-[var(--color-border)]"
+              className="h-4 w-4 rounded border-[var(--color-border)] text-[var(--color-primary)]"
             />
             Available for booking
           </label>
@@ -142,7 +217,7 @@ export function CreateAdSlotButton() {
             <button
               type="button"
               onClick={() => setIsOpen(false)}
-              className="rounded border border-[var(--color-border)] px-4 py-2 text-sm"
+              className="rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm font-medium transition-colors hover:bg-slate-100"
             >
               Cancel
             </button>

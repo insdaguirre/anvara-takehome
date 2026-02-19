@@ -38,10 +38,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   // See: https://tanstack.com/query/latest/docs/framework/react/guides/advanced-ssr
   return (
     <html lang="en">
-      <body className="min-h-screen antialiased">
+      <body className="flex min-h-screen flex-col antialiased">
         <AnalyticsListener />
         <Nav />
-        <main className="mx-auto max-w-6xl p-4">{children}</main>
+        <main className="mx-auto w-full max-w-6xl flex-1 p-4">{children}</main>
         <Footer />
         {shouldEnableGA ? <GoogleAnalytics gaId={GA_MEASUREMENT_ID} /> : null}
       </body>

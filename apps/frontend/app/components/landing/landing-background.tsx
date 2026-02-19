@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import LightPillar from './LightPillar';
 
 export function LandingBackground() {
-  const [overlayOpacity, setOverlayOpacity] = useState(0.15);
+  const [overlayOpacity, setOverlayOpacity] = useState(0.4);
 
   useEffect(() => {
     let ticking = false;
@@ -13,7 +13,7 @@ export function LandingBackground() {
       const hero = document.querySelector('section[aria-label="Hero"]');
       const heroHeight = hero?.clientHeight || window.innerHeight;
       const progress = Math.min(window.scrollY / heroHeight, 1);
-      const nextOpacity = 0.15 + progress * 0.35;
+      const nextOpacity = 0.4 + progress * 0.4;
       setOverlayOpacity(nextOpacity);
       ticking = false;
     };
@@ -51,7 +51,10 @@ export function LandingBackground() {
           mixBlendMode="screen"
           quality="high"
         />
-        <div className="absolute inset-0 bg-black" style={{ opacity: overlayOpacity }} />
+        <div
+          className="absolute inset-0"
+          style={{ backgroundColor: 'rgb(var(--landing-overlay-rgb))', opacity: overlayOpacity }}
+        />
       </div>
     </div>
   );

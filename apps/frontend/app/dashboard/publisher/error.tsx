@@ -1,14 +1,14 @@
 'use client';
 
-interface SponsorDashboardErrorProps {
+interface PublisherDashboardErrorProps {
   error: Error;
   reset: () => void;
 }
 
-export default function SponsorDashboardError({ error: _error, reset }: SponsorDashboardErrorProps) {
+export default function PublisherDashboardError({ error: _error, reset }: PublisherDashboardErrorProps) {
   return (
     <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-red-800">
-      <p className="text-base font-semibold">Failed to load sponsor dashboard.</p>
+      <p className="text-base font-semibold">Failed to load publisher dashboard.</p>
       <p className="mt-1 text-sm">The service is temporarily unavailable. Please try again.</p>
       <button
         type="button"

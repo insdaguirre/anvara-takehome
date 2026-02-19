@@ -1,7 +1,9 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useFormStatus } from 'react-dom';
+import type { DashboardToastInput } from '../../components/use-dashboard-toasts';
 import { createCampaign } from '../actions';
 import { INITIAL_CAMPAIGN_FORM_STATE, type CampaignFormState } from '../form-state';
 
@@ -12,61 +14,109 @@ function CreateCampaignSubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+      className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[var(--color-primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
     >
-      {pending ? 'Saving...' : 'Create Campaign'}
+      {pending ? 'Creating...' : 'Create Campaign'}
     </button>
   );
 }
 
-export function CreateCampaignButton() {
+interface CreateCampaignButtonProps {
+  onToast(toast: DashboardToastInput): void;
+}
+
+export function CreateCampaignButton({ onToast }: CreateCampaignButtonProps) {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
-  const [flashMessage, setFlashMessage] = useState<string | null>(null);
+  const nameInputRef = useRef<HTMLInputElement | null>(null);
   const [state, formAction] = useActionState(async (prevState: CampaignFormState, formData: FormData) => {
     const result = await createCampaign(prevState, formData);
     if (result.success) {
       setIsOpen(false);
-      setFlashMessage('Campaign created successfully.');
+      onToast({
+        tone: 'success',
+        title: 'Campaign created',
+        message: 'Your campaign was saved and the dashboard has been refreshed.',
+      });
+      router.refresh();
+    } else if (result.error) {
+      onToast({
+        tone: 'error',
+        title: 'Could not create campaign',
+        message: result.error,
+      });
     }
     return result;
   }, INITIAL_CAMPAIGN_FORM_STATE);
 
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const timeout = window.setTimeout(() => {
+      nameInputRef.current?.focus();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [isOpen]);
+
+  const nameErrorId = 'create-campaign-name-error';
+  const descriptionErrorId = 'create-campaign-description-error';
+  const budgetErrorId = 'create-campaign-budget-error';
+  const startDateErrorId = 'create-campaign-start-date-error';
+  const endDateErrorId = 'create-campaign-end-date-error';
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <button
         type="button"
         onClick={() => {
-          setFlashMessage(null);
           setIsOpen((current) => !current);
         }}
-        className="rounded bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
+        aria-expanded={isOpen}
+        aria-controls="create-campaign-form"
+        className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[var(--color-primary-hover)]"
       >
-        {isOpen ? 'Close Form' : 'Create Campaign'}
+        {isOpen ? 'Close Form' : 'New Campaign'}
       </button>
 
-      {flashMessage && <p className="text-sm text-green-600">{flashMessage}</p>}
-
       {isOpen && (
-        <form action={formAction} className="grid gap-3 rounded-lg border border-[var(--color-border)] p-4">
+        <form
+          id="create-campaign-form"
+          action={formAction}
+          className="grid gap-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-5 shadow-sm motion-safe:animate-[dashboard-dialog-in_180ms_ease-out]"
+        >
           {state.error && (
-            <div className="rounded border border-red-200 bg-red-50 p-2 text-sm text-red-700">
+            <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-2 text-sm text-red-700">
               {state.error}
             </div>
           )}
 
           <div>
             <label htmlFor="create-campaign-name" className="block text-sm font-medium">
-              Name
+              Name <span className="text-red-600">*</span>
             </label>
             <input
+              ref={nameInputRef}
               id="create-campaign-name"
               name="name"
               type="text"
+              required
+              maxLength={120}
               defaultValue={state.values?.name ?? ''}
-              className="mt-1 w-full rounded border border-[var(--color-border)] px-3 py-2"
+              aria-invalid={Boolean(state.fieldErrors?.name)}
+              aria-describedby={state.fieldErrors?.name ? nameErrorId : undefined}
+              className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
+                state.fieldErrors?.name
+                  ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                  : 'border-[var(--color-border)] focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]'
+              }`}
             />
             {state.fieldErrors?.name && (
-              <p className="mt-1 text-sm text-red-600">{state.fieldErrors.name}</p>
+              <p id={nameErrorId} className="mt-1 text-sm text-red-600">
+                {state.fieldErrors.name}
+              </p>
             )}
           </div>
 
@@ -79,60 +129,96 @@ export function CreateCampaignButton() {
               name="description"
               rows={3}
               defaultValue={state.values?.description ?? ''}
-              className="mt-1 w-full rounded border border-[var(--color-border)] px-3 py-2"
+              maxLength={1000}
+              aria-invalid={Boolean(state.fieldErrors?.description)}
+              aria-describedby={state.fieldErrors?.description ? descriptionErrorId : undefined}
+              className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
+                state.fieldErrors?.description
+                  ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                  : 'border-[var(--color-border)] focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]'
+              }`}
             />
             {state.fieldErrors?.description && (
-              <p className="mt-1 text-sm text-red-600">{state.fieldErrors.description}</p>
+              <p id={descriptionErrorId} className="mt-1 text-sm text-red-600">
+                {state.fieldErrors.description}
+              </p>
             )}
           </div>
 
           <div>
             <label htmlFor="create-campaign-budget" className="block text-sm font-medium">
-              Budget
+              Budget <span className="text-red-600">*</span>
             </label>
             <input
               id="create-campaign-budget"
               name="budget"
               type="number"
-              min="0"
+              required
+              min="0.01"
               step="0.01"
               defaultValue={state.values?.budget ?? ''}
-              className="mt-1 w-full rounded border border-[var(--color-border)] px-3 py-2"
+              aria-invalid={Boolean(state.fieldErrors?.budget)}
+              aria-describedby={state.fieldErrors?.budget ? budgetErrorId : undefined}
+              className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
+                state.fieldErrors?.budget
+                  ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                  : 'border-[var(--color-border)] focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]'
+              }`}
             />
             {state.fieldErrors?.budget && (
-              <p className="mt-1 text-sm text-red-600">{state.fieldErrors.budget}</p>
+              <p id={budgetErrorId} className="mt-1 text-sm text-red-600">
+                {state.fieldErrors.budget}
+              </p>
             )}
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label htmlFor="create-campaign-start-date" className="block text-sm font-medium">
-                Start Date
+                Start Date <span className="text-red-600">*</span>
               </label>
               <input
                 id="create-campaign-start-date"
                 name="startDate"
                 type="date"
+                required
                 defaultValue={state.values?.startDate ?? ''}
-                className="mt-1 w-full rounded border border-[var(--color-border)] px-3 py-2"
+                aria-invalid={Boolean(state.fieldErrors?.startDate)}
+                aria-describedby={state.fieldErrors?.startDate ? startDateErrorId : undefined}
+                className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
+                  state.fieldErrors?.startDate
+                    ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                    : 'border-[var(--color-border)] focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]'
+                }`}
               />
               {state.fieldErrors?.startDate && (
-                <p className="mt-1 text-sm text-red-600">{state.fieldErrors.startDate}</p>
+                <p id={startDateErrorId} className="mt-1 text-sm text-red-600">
+                  {state.fieldErrors.startDate}
+                </p>
               )}
             </div>
             <div>
               <label htmlFor="create-campaign-end-date" className="block text-sm font-medium">
-                End Date
+                End Date <span className="text-red-600">*</span>
               </label>
               <input
                 id="create-campaign-end-date"
                 name="endDate"
                 type="date"
+                required
                 defaultValue={state.values?.endDate ?? ''}
-                className="mt-1 w-full rounded border border-[var(--color-border)] px-3 py-2"
+                aria-invalid={Boolean(state.fieldErrors?.endDate)}
+                aria-describedby={state.fieldErrors?.endDate ? endDateErrorId : undefined}
+                className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
+                  state.fieldErrors?.endDate
+                    ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                    : 'border-[var(--color-border)] focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]'
+                }`}
               />
               {state.fieldErrors?.endDate && (
-                <p className="mt-1 text-sm text-red-600">{state.fieldErrors.endDate}</p>
+                <p id={endDateErrorId} className="mt-1 text-sm text-red-600">
+                  {state.fieldErrors.endDate}
+                </p>
               )}
             </div>
           </div>
@@ -142,7 +228,7 @@ export function CreateCampaignButton() {
             <button
               type="button"
               onClick={() => setIsOpen(false)}
-              className="rounded border border-[var(--color-border)] px-4 py-2 text-sm"
+              className="rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm font-medium transition-colors hover:bg-slate-100"
             >
               Cancel
             </button>

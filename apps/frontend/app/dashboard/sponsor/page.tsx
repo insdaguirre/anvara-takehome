@@ -1,11 +1,11 @@
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
+import { GrainientPageShell } from '@/app/components/grainient-page-shell';
 import { getUserRole } from '@/lib/auth-helpers';
 import type { Campaign } from '@/lib/types';
 import { getSponsorCampaigns } from './actions';
-import { CampaignList } from './components/campaign-list';
-import { CreateCampaignButton } from './components/create-campaign-button';
+import { SponsorDashboardClient } from './components/sponsor-dashboard-client';
 
 export default async function SponsorDashboard() {
   const session = await auth.api.getSession({
@@ -35,13 +35,8 @@ export default async function SponsorDashboard() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">My Campaigns</h1>
-        <CreateCampaignButton />
-      </div>
-
-      <CampaignList campaigns={campaigns} error={campaignError} />
-    </div>
+    <GrainientPageShell>
+      <SponsorDashboardClient campaigns={campaigns} error={campaignError} />
+    </GrainientPageShell>
   );
 }

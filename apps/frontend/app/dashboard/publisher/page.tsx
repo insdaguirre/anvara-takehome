@@ -1,10 +1,10 @@
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
+import { GrainientPageShell } from '@/app/components/grainient-page-shell';
 import { getUserRole } from '@/lib/auth-helpers';
 import type { AdSlot } from '@/lib/types';
-import { AdSlotList } from './components/ad-slot-list';
-import { CreateAdSlotButton } from './components/create-ad-slot-button';
+import { PublisherDashboardClient } from './components/publisher-dashboard-client';
 import { getPublisherAdSlots } from './actions';
 
 export default async function PublisherDashboard() {
@@ -35,13 +35,8 @@ export default async function PublisherDashboard() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">My Ad Slots</h1>
-        <CreateAdSlotButton />
-      </div>
-
-      <AdSlotList adSlots={adSlots} error={adSlotError} />
-    </div>
+    <GrainientPageShell>
+      <PublisherDashboardClient adSlots={adSlots} error={adSlotError} />
+    </GrainientPageShell>
   );
 }

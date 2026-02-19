@@ -2,6 +2,7 @@
 
 import React, { Children, useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
+import { useRouter } from 'next/navigation';
 
 import styles from './Stepper.module.css';
 
@@ -18,6 +19,8 @@ type StepperProps = React.HTMLAttributes<HTMLDivElement> & {
   nextButtonProps?: React.ButtonHTMLAttributes<HTMLButtonElement>;
   backButtonText?: string;
   nextButtonText?: string;
+  finalStepButtonText?: string;
+  finalStepHref?: string;
   disableStepIndicators?: boolean;
   renderStepIndicator?: (args: {
     step: number;
@@ -43,11 +46,14 @@ export default function Stepper({
   nextButtonProps = {},
   backButtonText = 'Back',
   nextButtonText = 'Continue',
+  finalStepButtonText,
+  finalStepHref,
   disableStepIndicators = false,
   renderStepIndicator,
   className,
   ...rest
 }: StepperProps) {
+  const router = useRouter();
   const [currentStep, setCurrentStep] = useState(initialStep);
   const [direction, setDirection] = useState(0);
   const stepsArray = Children.toArray(children);
@@ -77,6 +83,10 @@ export default function Stepper({
   };
 
   const handleComplete = () => {
+    if (finalStepHref) {
+      router.push(finalStepHref);
+      return;
+    }
     onFinalStepCompleted();
   };
 
@@ -146,7 +156,7 @@ export default function Stepper({
               className={cx(styles.nextButton, nextButtonClassName)}
               {...nextButtonRestProps}
             >
-              {nextButtonText}
+              {isLastStep ? (finalStepButtonText ?? nextButtonText) : nextButtonText}
             </button>
           </div>
         </div>

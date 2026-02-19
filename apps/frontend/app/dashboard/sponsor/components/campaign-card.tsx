@@ -1,13 +1,18 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useRef, useState, type RefObject } from 'react';
+import { useRouter } from 'next/navigation';
 import { useFormStatus } from 'react-dom';
+import { formatPrice } from '@/lib/format';
 import type { Campaign } from '@/lib/types';
+import { ConfirmDialog } from '../../components/confirm-dialog';
+import type { DashboardToastInput } from '../../components/use-dashboard-toasts';
 import { deleteCampaign, updateCampaign } from '../actions';
 import { INITIAL_CAMPAIGN_FORM_STATE, type CampaignFormState } from '../form-state';
 
 interface CampaignCardProps {
   campaign: Campaign;
+  onToast(toast: DashboardToastInput): void;
 }
 
 const statusColors: Record<string, string> = {
@@ -45,76 +50,121 @@ function SaveCampaignButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+      className="rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--color-primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
     >
       {pending ? 'Saving...' : 'Save'}
     </button>
   );
 }
 
-function DeleteCampaignButton() {
+function DeleteCampaignButton({ buttonRef }: { buttonRef: RefObject<HTMLButtonElement | null> }) {
   const { pending } = useFormStatus();
 
   return (
     <button
+      ref={buttonRef}
       type="submit"
       disabled={pending}
-      className="rounded border border-red-300 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+      className="rounded-lg border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
     >
       {pending ? 'Deleting...' : 'Delete'}
     </button>
   );
 }
 
-export function CampaignCard({ campaign }: CampaignCardProps) {
+export function CampaignCard({ campaign, onToast }: CampaignCardProps) {
+  const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
-  const [feedback, setFeedback] = useState<string | null>(null);
-  const [updateState, updateAction] = useActionState(async (prevState: CampaignFormState, formData: FormData) => {
-    const result = await updateCampaign(prevState, formData);
-    if (result.success) {
-      setIsEditing(false);
-      setFeedback('Campaign updated.');
-    }
-    return result;
-  }, INITIAL_CAMPAIGN_FORM_STATE);
-  const [deleteState, deleteAction] = useActionState(async (prevState: CampaignFormState, formData: FormData) => {
-    const result = await deleteCampaign(prevState, formData);
-    if (result.success) {
-      setFeedback('Campaign deleted.');
-    }
-    return result;
-  }, INITIAL_CAMPAIGN_FORM_STATE);
-  const progress =
-    campaign.budget > 0 ? (Number(campaign.spent) / Number(campaign.budget)) * 100 : 0;
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const allowDeleteSubmitRef = useRef(false);
+  const deleteFormRef = useRef<HTMLFormElement | null>(null);
+  const deleteButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [updateState, updateAction, isUpdatePending] = useActionState(
+    async (prevState: CampaignFormState, formData: FormData) => {
+      const result = await updateCampaign(prevState, formData);
+      if (result.success) {
+        setIsEditing(false);
+        onToast({
+          tone: 'success',
+          title: 'Campaign updated',
+          message: `${campaign.name} has been updated.`,
+        });
+        router.refresh();
+      } else if (result.error) {
+        onToast({
+          tone: 'error',
+          title: 'Unable to update campaign',
+          message: result.error,
+        });
+      }
+      return result;
+    },
+    INITIAL_CAMPAIGN_FORM_STATE
+  );
+  const [deleteState, deleteAction, isDeletePending] = useActionState(
+    async (prevState: CampaignFormState, formData: FormData) => {
+      const result = await deleteCampaign(prevState, formData);
+      if (result.success) {
+        onToast({
+          tone: 'success',
+          title: 'Campaign deleted',
+          message: `${campaign.name} has been removed.`,
+        });
+        router.refresh();
+      } else if (result.error) {
+        onToast({
+          tone: 'error',
+          title: 'Unable to delete campaign',
+          message: result.error,
+        });
+      }
+      return result;
+    },
+    INITIAL_CAMPAIGN_FORM_STATE
+  );
+  const progress = campaign.budget > 0 ? (Number(campaign.spent) / Number(campaign.budget)) * 100 : 0;
+  const progressLabel = `${Math.min(Math.round(progress), 100)}% spent`;
+  const editNameId = `edit-campaign-name-${campaign.id}`;
+  const editDescriptionId = `edit-campaign-description-${campaign.id}`;
+  const editBudgetId = `edit-campaign-budget-${campaign.id}`;
+  const editStartDateId = `edit-campaign-start-date-${campaign.id}`;
+  const editEndDateId = `edit-campaign-end-date-${campaign.id}`;
+  const editStatusId = `edit-campaign-status-${campaign.id}`;
+  const nameErrorId = `${editNameId}-error`;
+  const descriptionErrorId = `${editDescriptionId}-error`;
+  const budgetErrorId = `${editBudgetId}-error`;
+  const startDateErrorId = `${editStartDateId}-error`;
+  const endDateErrorId = `${editEndDateId}-error`;
+  const statusErrorId = `${editStatusId}-error`;
 
   return (
-    <div className="rounded-lg border border-[var(--color-border)] p-4">
-      <div className="mb-2 flex items-start justify-between">
-        <h3 className="font-semibold">{campaign.name}</h3>
+    <article className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <h3 className="text-base font-semibold text-[var(--color-foreground)]">{campaign.name}</h3>
         <span
-          className={`rounded px-2 py-0.5 text-xs ${statusColors[campaign.status] || 'bg-gray-100'}`}
+          className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusColors[campaign.status] || 'bg-gray-100 text-gray-700'}`}
         >
           {campaign.status}
         </span>
       </div>
 
       {campaign.description && (
-        <p className="mb-3 text-sm text-[var(--color-muted)] line-clamp-2">{campaign.description}</p>
+        <p className="mb-4 line-clamp-2 text-sm text-[var(--color-muted)]">{campaign.description}</p>
       )}
 
-      <div className="mb-2">
+      <div className="mb-3 rounded-lg bg-slate-50 p-3">
         <div className="flex justify-between text-sm">
           <span className="text-[var(--color-muted)]">Budget</span>
-          <span>
-            ${Number(campaign.spent).toLocaleString()} / ${Number(campaign.budget).toLocaleString()}
-          </span>
+          <span>{formatPrice(Number(campaign.spent))} / {formatPrice(Number(campaign.budget))}</span>
         </div>
         <div className="mt-1 h-1.5 rounded-full bg-gray-200">
           <div
-            className="h-1.5 rounded-full bg-[var(--color-primary)]"
+            className="h-1.5 rounded-full bg-[var(--color-primary)] transition-all duration-300"
             style={{ width: `${Math.min(progress, 100)}%` }}
+            aria-label={progressLabel}
           />
         </div>
+        <p className="mt-1 text-xs text-[var(--color-muted)]">{progressLabel}</p>
       </div>
 
       <div className="text-xs text-[var(--color-muted)]">
@@ -122,13 +172,20 @@ export function CampaignCard({ campaign }: CampaignCardProps) {
         {new Date(campaign.endDate).toLocaleDateString()}
       </div>
 
-      {feedback && <p className="mt-3 text-sm text-green-600">{feedback}</p>}
-      {deleteState.error && <p className="mt-3 text-sm text-red-600">{deleteState.error}</p>}
+      {deleteState.error && (
+        <p role="alert" className="mt-3 text-sm text-red-600">
+          {deleteState.error}
+        </p>
+      )}
 
       {isEditing ? (
-        <form action={updateAction} className="mt-4 space-y-3 border-t border-[var(--color-border)] pt-4">
+        <form
+          action={updateAction}
+          className="mt-4 space-y-3 border-t border-[var(--color-border)] pt-4"
+          aria-busy={isUpdatePending}
+        >
           {updateState.error && (
-            <div className="rounded border border-red-200 bg-red-50 p-2 text-sm text-red-700">
+            <div role="alert" className="rounded border border-red-200 bg-red-50 p-2 text-sm text-red-700">
               {updateState.error}
             </div>
           )}
@@ -136,100 +193,149 @@ export function CampaignCard({ campaign }: CampaignCardProps) {
           <input type="hidden" name="id" value={campaign.id} />
 
           <div>
-            <label htmlFor={`edit-campaign-name-${campaign.id}`} className="block text-xs font-medium">
+            <label htmlFor={editNameId} className="block text-xs font-medium">
               Name
             </label>
             <input
-              id={`edit-campaign-name-${campaign.id}`}
+              id={editNameId}
               name="name"
+              required
+              maxLength={120}
               defaultValue={updateState.values?.name ?? campaign.name}
-              className="mt-1 w-full rounded border border-[var(--color-border)] px-3 py-2 text-sm"
+              aria-invalid={Boolean(updateState.fieldErrors?.name)}
+              aria-describedby={updateState.fieldErrors?.name ? nameErrorId : undefined}
+              className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
+                updateState.fieldErrors?.name
+                  ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                  : 'border-[var(--color-border)] focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]'
+              }`}
             />
             {updateState.fieldErrors?.name && (
-              <p className="mt-1 text-xs text-red-600">{updateState.fieldErrors.name}</p>
+              <p id={nameErrorId} className="mt-1 text-xs text-red-600">
+                {updateState.fieldErrors.name}
+              </p>
             )}
           </div>
 
           <div>
-            <label htmlFor={`edit-campaign-description-${campaign.id}`} className="block text-xs font-medium">
+            <label htmlFor={editDescriptionId} className="block text-xs font-medium">
               Description
             </label>
             <textarea
-              id={`edit-campaign-description-${campaign.id}`}
+              id={editDescriptionId}
               name="description"
               rows={2}
+              maxLength={1000}
               defaultValue={updateState.values?.description ?? (campaign.description || '')}
-              className="mt-1 w-full rounded border border-[var(--color-border)] px-3 py-2 text-sm"
+              aria-invalid={Boolean(updateState.fieldErrors?.description)}
+              aria-describedby={updateState.fieldErrors?.description ? descriptionErrorId : undefined}
+              className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
+                updateState.fieldErrors?.description
+                  ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                  : 'border-[var(--color-border)] focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]'
+              }`}
             />
             {updateState.fieldErrors?.description && (
-              <p className="mt-1 text-xs text-red-600">{updateState.fieldErrors.description}</p>
+              <p id={descriptionErrorId} className="mt-1 text-xs text-red-600">
+                {updateState.fieldErrors.description}
+              </p>
             )}
           </div>
 
           <div>
-            <label htmlFor={`edit-campaign-budget-${campaign.id}`} className="block text-xs font-medium">
+            <label htmlFor={editBudgetId} className="block text-xs font-medium">
               Budget
             </label>
             <input
-              id={`edit-campaign-budget-${campaign.id}`}
+              id={editBudgetId}
               name="budget"
               type="number"
-              min="0"
+              required
+              min="0.01"
               step="0.01"
               defaultValue={updateState.values?.budget ?? Number(campaign.budget)}
-              className="mt-1 w-full rounded border border-[var(--color-border)] px-3 py-2 text-sm"
+              aria-invalid={Boolean(updateState.fieldErrors?.budget)}
+              aria-describedby={updateState.fieldErrors?.budget ? budgetErrorId : undefined}
+              className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
+                updateState.fieldErrors?.budget
+                  ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                  : 'border-[var(--color-border)] focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]'
+              }`}
             />
             {updateState.fieldErrors?.budget && (
-              <p className="mt-1 text-xs text-red-600">{updateState.fieldErrors.budget}</p>
+              <p id={budgetErrorId} className="mt-1 text-xs text-red-600">
+                {updateState.fieldErrors.budget}
+              </p>
             )}
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label
-                htmlFor={`edit-campaign-start-date-${campaign.id}`}
-                className="block text-xs font-medium"
-              >
+              <label htmlFor={editStartDateId} className="block text-xs font-medium">
                 Start Date
               </label>
               <input
-                id={`edit-campaign-start-date-${campaign.id}`}
+                id={editStartDateId}
                 name="startDate"
                 type="date"
+                required
                 defaultValue={updateState.values?.startDate ?? toDateInputValue(campaign.startDate)}
-                className="mt-1 w-full rounded border border-[var(--color-border)] px-3 py-2 text-sm"
+                aria-invalid={Boolean(updateState.fieldErrors?.startDate)}
+                aria-describedby={updateState.fieldErrors?.startDate ? startDateErrorId : undefined}
+                className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
+                  updateState.fieldErrors?.startDate
+                    ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                    : 'border-[var(--color-border)] focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]'
+                }`}
               />
               {updateState.fieldErrors?.startDate && (
-                <p className="mt-1 text-xs text-red-600">{updateState.fieldErrors.startDate}</p>
+                <p id={startDateErrorId} className="mt-1 text-xs text-red-600">
+                  {updateState.fieldErrors.startDate}
+                </p>
               )}
             </div>
 
             <div>
-              <label htmlFor={`edit-campaign-end-date-${campaign.id}`} className="block text-xs font-medium">
+              <label htmlFor={editEndDateId} className="block text-xs font-medium">
                 End Date
               </label>
               <input
-                id={`edit-campaign-end-date-${campaign.id}`}
+                id={editEndDateId}
                 name="endDate"
                 type="date"
+                required
                 defaultValue={updateState.values?.endDate ?? toDateInputValue(campaign.endDate)}
-                className="mt-1 w-full rounded border border-[var(--color-border)] px-3 py-2 text-sm"
+                aria-invalid={Boolean(updateState.fieldErrors?.endDate)}
+                aria-describedby={updateState.fieldErrors?.endDate ? endDateErrorId : undefined}
+                className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
+                  updateState.fieldErrors?.endDate
+                    ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                    : 'border-[var(--color-border)] focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]'
+                }`}
               />
               {updateState.fieldErrors?.endDate && (
-                <p className="mt-1 text-xs text-red-600">{updateState.fieldErrors.endDate}</p>
+                <p id={endDateErrorId} className="mt-1 text-xs text-red-600">
+                  {updateState.fieldErrors.endDate}
+                </p>
               )}
             </div>
           </div>
 
           <div>
-            <label htmlFor={`edit-campaign-status-${campaign.id}`} className="block text-xs font-medium">
+            <label htmlFor={editStatusId} className="block text-xs font-medium">
               Status
             </label>
             <select
-              id={`edit-campaign-status-${campaign.id}`}
+              id={editStatusId}
               name="status"
               defaultValue={updateState.values?.status ?? campaign.status}
-              className="mt-1 w-full rounded border border-[var(--color-border)] px-3 py-2 text-sm"
+              aria-invalid={Boolean(updateState.fieldErrors?.status)}
+              aria-describedby={updateState.fieldErrors?.status ? statusErrorId : undefined}
+              className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
+                updateState.fieldErrors?.status
+                  ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                  : 'border-[var(--color-border)] focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]'
+              }`}
             >
               {CAMPAIGN_STATUSES.map((statusOption) => (
                 <option key={statusOption} value={statusOption}>
@@ -238,7 +344,9 @@ export function CampaignCard({ campaign }: CampaignCardProps) {
               ))}
             </select>
             {updateState.fieldErrors?.status && (
-              <p className="mt-1 text-xs text-red-600">{updateState.fieldErrors.status}</p>
+              <p id={statusErrorId} className="mt-1 text-xs text-red-600">
+                {updateState.fieldErrors.status}
+              </p>
             )}
           </div>
 
@@ -247,7 +355,7 @@ export function CampaignCard({ campaign }: CampaignCardProps) {
             <button
               type="button"
               onClick={() => setIsEditing(false)}
-              className="rounded border border-[var(--color-border)] px-3 py-1.5 text-sm"
+              className="rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-sm font-medium transition-colors hover:bg-slate-100"
             >
               Cancel
             </button>
@@ -258,27 +366,43 @@ export function CampaignCard({ campaign }: CampaignCardProps) {
           <button
             type="button"
             onClick={() => {
-              setFeedback(null);
               setIsEditing(true);
             }}
-            className="rounded border border-[var(--color-border)] px-3 py-1.5 text-sm hover:bg-gray-50"
+            className="rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-sm font-medium transition-colors hover:bg-slate-100"
           >
             Edit
           </button>
           <form
+            ref={deleteFormRef}
             action={deleteAction}
             onSubmit={(event) => {
-              const confirmed = window.confirm('Delete this campaign? This action cannot be undone.');
-              if (!confirmed) {
+              if (!allowDeleteSubmitRef.current) {
                 event.preventDefault();
+                setIsDeleteDialogOpen(true);
+                return;
               }
+              allowDeleteSubmitRef.current = false;
             }}
           >
             <input type="hidden" name="id" value={campaign.id} />
-            <DeleteCampaignButton />
+            <DeleteCampaignButton buttonRef={deleteButtonRef} />
           </form>
         </div>
       )}
-    </div>
+
+      <ConfirmDialog
+        isOpen={isDeleteDialogOpen}
+        title="Delete campaign?"
+        description="This action cannot be undone and will permanently remove this campaign."
+        confirmLabel="Delete campaign"
+        isPending={isDeletePending}
+        onCancel={() => setIsDeleteDialogOpen(false)}
+        onConfirm={() => {
+          allowDeleteSubmitRef.current = true;
+          setIsDeleteDialogOpen(false);
+          deleteFormRef.current?.requestSubmit();
+        }}
+      />
+    </article>
   );
 }

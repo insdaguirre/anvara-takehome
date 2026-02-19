@@ -338,7 +338,7 @@ export function AdSlotDetail({ id }: Props) {
       <Link
         href="/marketplace"
         onClick={handleBackToMarketplace}
-        className="text-[var(--color-primary)] hover:underline"
+        className="text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] hover:underline dark:text-white dark:hover:text-white/80"
       >
         ← Back to Marketplace
       </Link>
@@ -541,7 +541,7 @@ export function AdSlotDetail({ id }: Props) {
         </main>
 
         <aside className="lg:col-span-1">
-          <div className="space-y-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-6 lg:sticky lg:top-6">
+          <div className="space-y-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-6 lg:sticky lg:top-24">
             <div>
               <p className="text-3xl font-bold text-[var(--color-primary)]">{formatPrice(adSlot.basePrice)}</p>
               <p className="text-sm text-[var(--color-muted)]">per month</p>

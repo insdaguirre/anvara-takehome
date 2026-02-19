@@ -1,3 +1,4 @@
+import { GrainientPageShell } from '@/app/components/grainient-page-shell';
 import { AdSlotDetail } from './components/ad-slot-detail';
 
 interface Props {
@@ -7,5 +8,9 @@ interface Props {
 export default async function AdSlotPage({ params }: Props) {
   const { id } = await params;
 
-  return <AdSlotDetail id={id} />;
+  return (
+    <GrainientPageShell>
+      <AdSlotDetail id={id} />
+    </GrainientPageShell>
+  );
 }

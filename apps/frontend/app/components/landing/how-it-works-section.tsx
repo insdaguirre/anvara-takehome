@@ -29,7 +29,13 @@ export function HowItWorksSection() {
         <h2 className="text-center text-3xl font-bold md:text-4xl">How It Works</h2>
 
         <div className="mt-10">
-          <Stepper initialStep={1} backButtonText="Previous" nextButtonText="Next">
+          <Stepper
+            initialStep={1}
+            backButtonText="Previous"
+            nextButtonText="Next"
+            finalStepButtonText="Get Started"
+            finalStepHref="/marketplace"
+          >
             {steps.map((step) => {
               const Icon = step.icon;
               return (

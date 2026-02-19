@@ -1,3 +1,4 @@
+import { GrainientPageShell } from '@/app/components/grainient-page-shell';
 import { AdSlotGrid } from './components/ad-slot-grid';
 
 // FIXME: This page fetches all ad slots client-side. Consider:
@@ -7,15 +8,17 @@ import { AdSlotGrid } from './components/ad-slot-grid';
 
 export default function MarketplacePage() {
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Find the perfect ad placement for your brand</h1>
-        <p className="text-[var(--color-muted)]">
-          Compare publishers, audience reach, and pricing to book your next campaign.
-        </p>
-      </div>
+    <GrainientPageShell>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold">Find the perfect ad placement for your brand</h1>
+          <p className="text-[var(--color-muted)]">
+            Compare publishers, audience reach, and pricing to book your next campaign.
+          </p>
+        </div>
 
-      <AdSlotGrid />
-    </div>
+        <AdSlotGrid />
+      </div>
+    </GrainientPageShell>
   );
 }

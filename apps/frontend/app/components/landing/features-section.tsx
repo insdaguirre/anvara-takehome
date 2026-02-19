@@ -42,26 +42,26 @@ const publisherFeatures = [
   },
 ];
 
+const featureCardClassName =
+  'rounded-xl border border-[var(--color-border)] bg-[rgb(var(--landing-overlay-rgb)/0.6)] p-6 transition-all duration-200 hover:border-[var(--color-primary)]/30 hover:shadow-md';
+
 export function FeaturesSection() {
   return (
     <section aria-label="Features" className="py-16 md:py-24">
       <div className="mx-auto max-w-6xl">
         <h2 className="text-center text-3xl font-bold md:text-4xl">Why Anvara?</h2>
-        <p className="mx-auto mt-4 max-w-2xl text-center text-lg text-[var(--color-muted)]">
+        <p className="mx-auto mt-4 max-w-2xl text-center text-lg text-[rgb(var(--landing-feature-label-rgb))]">
           Everything sponsors and publishers need to create successful partnerships.
         </p>
 
         <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 md:gap-8 lg:grid-cols-3">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-muted)] sm:col-span-2 lg:col-span-3">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--landing-feature-label-rgb))] sm:col-span-2 lg:col-span-3">
             For Sponsors
           </h3>
           {sponsorFeatures.map((feature) => {
             const Icon = feature.icon;
             return (
-              <article
-                key={feature.title}
-                className="rounded-xl border border-[var(--color-border)] bg-gradient-to-b from-black/60 to-black/60 p-6 transition-all duration-200 hover:border-[var(--color-primary)]/30 hover:shadow-md"
-              >
+              <article key={feature.title} className={featureCardClassName}>
                 <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--color-primary)]/10">
                   <Icon className="h-6 w-6 text-[var(--color-primary)]" aria-hidden="true" />
                 </div>
@@ -71,16 +71,13 @@ export function FeaturesSection() {
             );
           })}
 
-          <h3 className="mt-2 text-sm font-semibold uppercase tracking-wide text-[var(--color-muted)] sm:col-span-2 lg:col-span-3">
+          <h3 className="mt-2 text-sm font-semibold uppercase tracking-wide text-[rgb(var(--landing-feature-label-rgb))] sm:col-span-2 lg:col-span-3">
             For Publishers
           </h3>
           {publisherFeatures.map((feature) => {
             const Icon = feature.icon;
             return (
-              <article
-                key={feature.title}
-                className="rounded-xl border border-[var(--color-border)] bg-gradient-to-b from-black/60 to-black/60 p-6 transition-all duration-200 hover:border-[var(--color-primary)]/30 hover:shadow-md"
-              >
+              <article key={feature.title} className={featureCardClassName}>
                 <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--color-secondary)]/10">
                   <Icon className="h-6 w-6 text-[var(--color-secondary)]" aria-hidden="true" />
                 </div>
