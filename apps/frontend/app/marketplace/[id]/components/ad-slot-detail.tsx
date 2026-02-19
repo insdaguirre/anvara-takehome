@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import Link from 'next/link';
 import { getMarketplaceAdSlot } from '@/lib/api';
 import { authClient } from '@/auth-client';
+import { useABTest } from '@/hooks/use-ab-test';
 import { analytics } from '@/lib/analytics';
 import { formatCompactNumber, formatPrice } from '@/lib/format';
 import { BookingModal } from './booking-modal';
@@ -63,6 +64,7 @@ interface Props {
 }
 
 export function AdSlotDetail({ id }: Props) {
+  const { variant: ctaButtonTextVariant, trackOutcome } = useABTest('cta-button-text');
   const [adSlot, setAdSlot] = useState<AdSlotDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -232,6 +234,7 @@ export function AdSlotDetail({ id }: Props) {
 
     const ctaLocation =
       event.currentTarget.dataset.location === 'mobile_footer' ? 'mobile_footer' : 'desktop_sidebar';
+    trackOutcome('book_click', { cta_location: ctaLocation });
     analytics.ctaClick('book', ctaLocation, adSlot.id, adSlot.name, adSlot.isAvailable);
     setReturnFocusElement(event.currentTarget);
     setIsBookingModalOpen(true);
@@ -242,6 +245,7 @@ export function AdSlotDetail({ id }: Props) {
 
     const ctaLocation =
       event.currentTarget.dataset.location === 'mobile_footer' ? 'mobile_footer' : 'desktop_sidebar';
+    trackOutcome('quote_click', { cta_location: ctaLocation });
     analytics.ctaClick('quote', ctaLocation, adSlot.id, adSlot.name, adSlot.isAvailable);
     setReturnFocusElement(event.currentTarget);
     setIsQuoteModalOpen(true);
@@ -327,6 +331,7 @@ export function AdSlotDetail({ id }: Props) {
     'inline-flex w-full items-center justify-center rounded-lg px-4 py-3 font-semibold transition-colors';
   const secondaryCtaClassName =
     'inline-flex w-full items-center justify-center rounded-lg border border-[var(--color-primary)] px-4 py-3 font-semibold text-[var(--color-primary)] transition-colors hover:bg-[var(--color-primary)]/10';
+  const bookCtaLabel = ctaButtonTextVariant === 'B' ? 'Get Started Now' : 'Book This Placement';
 
   return (
     <div className="space-y-6 pb-24 lg:pb-0">
@@ -574,7 +579,7 @@ export function AdSlotDetail({ id }: Props) {
                   data-cta-type="book"
                   className={`${ctaClassName} bg-[var(--color-primary)] text-white hover:opacity-90`}
                 >
-                  Book This Placement
+                  {bookCtaLabel}
                 </button>
               ) : shouldShowLogin ? (
                 <Link
@@ -669,7 +674,7 @@ export function AdSlotDetail({ id }: Props) {
                   data-location="mobile_footer"
                   className={`${ctaClassName} w-full bg-[var(--color-primary)] px-4 py-2 text-sm text-white sm:w-auto`}
                 >
-                  Book This Placement
+                  {bookCtaLabel}
                 </button>
               ) : shouldShowLogin ? (
                 <Link

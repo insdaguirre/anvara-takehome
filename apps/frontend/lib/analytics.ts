@@ -1,4 +1,5 @@
 import { sendGA4Event } from './ga4-bridge';
+import type { ABTestKey } from './ab-tests';
 
 type EventPropertyValue = string | number | boolean | null;
 type EventProperties = Record<string, EventPropertyValue>;
@@ -91,6 +92,10 @@ function getDedupeKeyValue(value: EventPropertyValue | undefined): string {
 }
 
 function buildDedupeKey(event: string, properties: EventProperties): string {
+  if (event.startsWith('ab_')) {
+    return `${event}:${getDedupeKeyValue(properties.test_key)}`;
+  }
+
   if (event === 'navigation') {
     return `${event}:${getDedupeKeyValue(properties.from_page)}:${getDedupeKeyValue(properties.to_page)}:${getDedupeKeyValue(properties.navigation_type)}`;
   }
@@ -165,6 +170,20 @@ export function track(event: string, properties: EventProperties = {}): void {
 }
 
 export const analytics = {
+  abAssigned: (testKey: ABTestKey, variant: string) =>
+    track('ab_assigned', { test_key: testKey, variant }),
+
+  abExposed: (testKey: ABTestKey, variant: string) =>
+    track('ab_exposed', { test_key: testKey, variant }),
+
+  abOutcome: (testKey: ABTestKey, variant: string, outcome: string, extra: EventProperties = {}) =>
+    track('ab_outcome', {
+      test_key: testKey,
+      variant,
+      outcome,
+      ...extra,
+    }),
+
   marketplaceView: (slotCount: number) => track('marketplace_view', { slot_count: slotCount }),
 
   listingCardImpression: (slotId: string, slotName: string, position: number) =>
