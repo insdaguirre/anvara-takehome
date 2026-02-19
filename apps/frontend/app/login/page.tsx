@@ -74,7 +74,7 @@ export default function LoginPage() {
     <>
       <LandingBackground />
       <div className="relative z-10 flex min-h-screen items-center justify-center px-4">
-        <div className="w-full max-w-md rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] p-6 shadow-sm">
+        <div className="w-full max-w-md rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] p-6 shadow-sm motion-safe:animate-[page-enter_320ms_ease-out]">
           <h1 className="mb-6 text-2xl font-bold">Login to Anvara</h1>
 
           {error && (

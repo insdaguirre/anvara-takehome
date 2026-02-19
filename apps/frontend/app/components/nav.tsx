@@ -16,6 +16,11 @@ export function Nav() {
   const pathname = usePathname();
   const user = session?.user;
   const [role, setRole] = useState<UserRole>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // TODO: Convert to server component and fetch role server-side
   // Fetch user role from backend when user is logged in
@@ -114,7 +119,7 @@ export function Nav() {
                 </Link>
               )}
 
-              {isPending ? (
+              {!mounted || isPending ? (
                 <span className="text-[var(--color-muted)]">...</span>
               ) : user ? (
                 <div className="flex items-center gap-4">

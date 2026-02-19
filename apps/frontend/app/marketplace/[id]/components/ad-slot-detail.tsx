@@ -295,7 +295,53 @@ export function AdSlotDetail({ id }: Props) {
   };
 
   if (loading) {
-    return <div className="py-12 text-center text-[var(--color-muted)]">Loading listing details...</div>;
+    return (
+      <div className="space-y-6 pb-24 lg:pb-0" role="status" aria-live="polite" aria-busy="true">
+        <span className="sr-only">Loading listing details...</span>
+        <div className="h-5 w-40 rounded bg-gray-200 motion-safe:animate-pulse motion-reduce:animate-none" />
+
+        <div className="space-y-8 lg:grid lg:grid-cols-3 lg:gap-8 lg:space-y-0">
+          <div className="space-y-6 lg:col-span-2">
+            <section className="rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-6">
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div className="w-full space-y-3">
+                  <div className="h-8 w-2/3 rounded bg-gray-200 motion-safe:animate-pulse motion-reduce:animate-none" />
+                  <div className="h-4 w-1/2 rounded bg-gray-200 motion-safe:animate-pulse motion-reduce:animate-none" />
+                </div>
+                <div className="h-8 w-20 rounded bg-gray-200 motion-safe:animate-pulse motion-reduce:animate-none" />
+              </div>
+              <div className="space-y-2">
+                <div className="h-4 w-full rounded bg-gray-200 motion-safe:animate-pulse motion-reduce:animate-none" />
+                <div className="h-4 w-5/6 rounded bg-gray-200 motion-safe:animate-pulse motion-reduce:animate-none" />
+              </div>
+            </section>
+
+            <section className="rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-6">
+              <div className="mb-4 h-6 w-40 rounded bg-gray-200 motion-safe:animate-pulse motion-reduce:animate-none" />
+              <div className="grid gap-3 sm:grid-cols-3">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <div key={index} className="rounded-lg border border-[var(--color-border)] p-4">
+                    <div className="h-4 w-20 rounded bg-gray-200 motion-safe:animate-pulse motion-reduce:animate-none" />
+                    <div className="mt-2 h-8 w-16 rounded bg-gray-200 motion-safe:animate-pulse motion-reduce:animate-none" />
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
+
+          <aside className="lg:col-span-1">
+            <div className="space-y-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-6 lg:sticky lg:top-24">
+              <div className="h-10 w-28 rounded bg-gray-200 motion-safe:animate-pulse motion-reduce:animate-none" />
+              <div className="h-4 w-24 rounded bg-gray-200 motion-safe:animate-pulse motion-reduce:animate-none" />
+              <div className="space-y-2">
+                <div className="h-11 w-full rounded-lg bg-gray-200 motion-safe:animate-pulse motion-reduce:animate-none" />
+                <div className="h-11 w-full rounded-lg bg-gray-200 motion-safe:animate-pulse motion-reduce:animate-none" />
+              </div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    );
   }
 
   if (error || !adSlot) {
@@ -385,7 +431,7 @@ export function AdSlotDetail({ id }: Props) {
           </section>
 
           {bookingSuccess && (
-            <section className="rounded-xl border border-green-200 bg-green-50 p-6">
+            <section className="rounded-xl border border-green-200 bg-green-50 p-6 motion-safe:animate-[page-enter_240ms_ease-out]">
               <h2 className="text-lg font-semibold text-green-800">Booking Request Submitted!</h2>
               <p className="mt-2 text-sm text-green-700">What happens next:</p>
               <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-green-700">
@@ -417,7 +463,7 @@ export function AdSlotDetail({ id }: Props) {
           )}
 
           {quoteSuccess && (
-            <section className="rounded-xl border border-blue-200 bg-blue-50 p-6">
+            <section className="rounded-xl border border-blue-200 bg-blue-50 p-6 motion-safe:animate-[page-enter_240ms_ease-out]">
               <h2 className="text-lg font-semibold text-blue-800">Quote Request Submitted!</h2>
               <p className="mt-2 text-sm text-blue-700">What happens next:</p>
               <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-blue-700">

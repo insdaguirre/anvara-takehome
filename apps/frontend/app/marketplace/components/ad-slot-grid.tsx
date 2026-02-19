@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { motion, useReducedMotion } from 'motion/react';
 import { getMarketplaceAdSlots } from '@/lib/api';
 import { analytics } from '@/lib/analytics';
 import { formatCompactNumber, formatPrice } from '@/lib/format';
@@ -25,6 +26,26 @@ const categoryColors: Record<string, string> = {
   Newsletter: 'bg-purple-500',
   Video: 'bg-red-500',
   Business: 'bg-emerald-500',
+};
+
+const gridEntranceVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.06,
+      delayChildren: 0.04,
+    },
+  },
+};
+
+const gridItemVariants = {
+  hidden: { opacity: 0, y: 8 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.2, ease: [0.22, 1, 0.36, 1] as const },
+  },
 };
 
 interface MarketplaceAdSlot {
@@ -78,6 +99,7 @@ export function AdSlotGrid() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const hasTrackedView = useRef(false);
+  const shouldReduceMotion = useReducedMotion();
 
   const loadAdSlots = useCallback(() => {
     setLoading(true);
@@ -183,7 +205,12 @@ export function AdSlotGrid() {
           </button>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <motion.div
+          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          variants={shouldReduceMotion ? undefined : gridEntranceVariants}
+          initial={shouldReduceMotion ? false : 'hidden'}
+          animate={shouldReduceMotion ? undefined : 'visible'}
+        >
           {filteredSlots.map((slot) => {
             const category = slot.publisher?.category ?? '';
             const stripeColor = categoryColors[category] || 'bg-gray-400';
@@ -192,84 +219,85 @@ export function AdSlotGrid() {
             const placementCount = slot._count?.placements ?? 0;
 
             return (
-              <Link
-                key={slot.id}
-                href={`/marketplace/${slot.id}`}
-                onClick={() =>
-                  analytics.listingCardClick(slot.id, slot.name, slot.type, Number(slot.basePrice))
-                }
-                className={`group relative block overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg ${!slot.isAvailable ? 'opacity-60' : ''}`}
-              >
-                <div className={`h-1 w-full ${stripeColor}`} />
+              <motion.div key={slot.id} variants={shouldReduceMotion ? undefined : gridItemVariants}>
+                <Link
+                  href={`/marketplace/${slot.id}`}
+                  onClick={() =>
+                    analytics.listingCardClick(slot.id, slot.name, slot.type, Number(slot.basePrice))
+                  }
+                  className={`group relative block overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg ${!slot.isAvailable ? 'opacity-60' : ''}`}
+                >
+                  <div className={`h-1 w-full ${stripeColor}`} />
 
-                {!slot.isAvailable && (
-                  <span className="absolute right-3 top-3 rounded-full bg-gray-900 px-2 py-0.5 text-xs font-medium text-white">
-                    Booked
-                  </span>
-                )}
-
-                <div className="space-y-3 p-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="line-clamp-2 font-semibold">{slot.name}</h3>
-                    <span
-                      className={`shrink-0 rounded px-2 py-0.5 text-xs ${typeColors[slot.type] || 'bg-gray-100 text-gray-700'}`}
-                    >
-                      {slot.type}
+                  {!slot.isAvailable && (
+                    <span className="absolute right-3 top-3 rounded-full bg-gray-900 px-2 py-0.5 text-xs font-medium text-white">
+                      Booked
                     </span>
-                  </div>
-
-                  {slot.publisher && (
-                    <p className="text-sm text-[var(--color-muted)]">
-                      by {slot.publisher.name}{' '}
-                      {slot.publisher.isVerified && (
-                        <span className="inline-flex items-center gap-1 text-xs text-blue-600">
-                          <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-blue-100 text-[10px]">
-                            ✓
-                          </span>
-                          Verified
-                        </span>
-                      )}
-                    </p>
                   )}
 
-                  {slot.description && (
-                    <p className="line-clamp-2 text-sm text-[var(--color-muted)]">{slot.description}</p>
-                  )}
-
-                  <div className="border-y border-[var(--color-border)] py-2 text-xs text-[var(--color-muted)]">
-                    <p className="line-clamp-1">
-                      {views > 0 ? `${formatCompactNumber(views)} views` : 'New publisher'} ·{' '}
-                      {subscribers > 0
-                        ? `${formatCompactNumber(subscribers)} subscribers`
-                        : 'Growing audience'}{' '}
-                      · {slot.position || 'Standard'}
-                    </p>
-                  </div>
-
-                  {placementCount > 0 && (
-                    <p className="text-xs text-[var(--color-muted)]">{placementCount} past bookings</p>
-                  )}
-
-                  <div className="flex items-end justify-between">
-                    <div>
+                  <div className="space-y-3 p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="line-clamp-2 font-semibold">{slot.name}</h3>
                       <span
-                        className={`text-sm ${slot.isAvailable ? 'text-green-600' : 'text-[var(--color-muted)]'}`}
+                        className={`shrink-0 rounded px-2 py-0.5 text-xs ${typeColors[slot.type] || 'bg-gray-100 text-gray-700'}`}
                       >
-                        {slot.isAvailable ? '● Available' : '○ Booked'}
+                        {slot.type}
                       </span>
-                      <p className="font-semibold text-[var(--color-primary)]">
-                        {formatPrice(slot.basePrice)}/mo
+                    </div>
+
+                    {slot.publisher && (
+                      <p className="text-sm text-[var(--color-muted)]">
+                        by {slot.publisher.name}{' '}
+                        {slot.publisher.isVerified && (
+                          <span className="inline-flex items-center gap-1 text-xs text-blue-600">
+                            <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-blue-100 text-[10px]">
+                              ✓
+                            </span>
+                            Verified
+                          </span>
+                        )}
+                      </p>
+                    )}
+
+                    {slot.description && (
+                      <p className="line-clamp-2 text-sm text-[var(--color-muted)]">{slot.description}</p>
+                    )}
+
+                    <div className="border-y border-[var(--color-border)] py-2 text-xs text-[var(--color-muted)]">
+                      <p className="line-clamp-1">
+                        {views > 0 ? `${formatCompactNumber(views)} views` : 'New publisher'} ·{' '}
+                        {subscribers > 0
+                          ? `${formatCompactNumber(subscribers)} subscribers`
+                          : 'Growing audience'}{' '}
+                        · {slot.position || 'Standard'}
                       </p>
                     </div>
-                    <span className="text-sm font-medium text-[var(--color-primary)] group-hover:underline">
-                      View Details →
-                    </span>
+
+                    {placementCount > 0 && (
+                      <p className="text-xs text-[var(--color-muted)]">{placementCount} past bookings</p>
+                    )}
+
+                    <div className="flex items-end justify-between">
+                      <div>
+                        <span
+                          className={`text-sm ${slot.isAvailable ? 'text-green-600' : 'text-[var(--color-muted)]'}`}
+                        >
+                          {slot.isAvailable ? '● Available' : '○ Booked'}
+                        </span>
+                        <p className="font-semibold text-[var(--color-primary)]">
+                          {formatPrice(slot.basePrice)}/mo
+                        </p>
+                      </div>
+                      <span className="text-sm font-medium text-[var(--color-primary)] group-hover:underline">
+                        View Details →
+                      </span>
+                    </div>
                   </div>
-                </div>
-              </Link>
+                </Link>
+              </motion.div>
             );
           })}
-        </div>
+        </motion.div>
       )}
     </div>
   );

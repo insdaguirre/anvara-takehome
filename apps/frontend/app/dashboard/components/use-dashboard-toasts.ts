@@ -12,14 +12,17 @@ export interface DashboardToastInput {
 
 export interface DashboardToast extends DashboardToastInput {
   id: number;
+  exiting?: boolean;
 }
 
 const TOAST_DURATION_MS = 4200;
+const TOAST_EXIT_DURATION_MS = 180;
 
 export function useDashboardToasts() {
   const [toasts, setToasts] = useState<DashboardToast[]>([]);
   const nextToastIdRef = useRef(1);
   const timeoutMapRef = useRef<Map<number, number>>(new Map());
+  const exitTimeoutMapRef = useRef<Map<number, number>>(new Map());
 
   const dismissToast = useCallback((id: number) => {
     const timeoutId = timeoutMapRef.current.get(id);
@@ -28,7 +31,28 @@ export function useDashboardToasts() {
       timeoutMapRef.current.delete(id);
     }
 
-    setToasts((current) => current.filter((toast) => toast.id !== id));
+    if (exitTimeoutMapRef.current.has(id)) return;
+
+    const prefersReducedMotion =
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    if (prefersReducedMotion) {
+      setToasts((current) => current.filter((toast) => toast.id !== id));
+      return;
+    }
+
+    setToasts((current) =>
+      current.map((toast) => (toast.id === id ? { ...toast, exiting: true } : toast))
+    );
+
+    const exitTimeoutId = window.setTimeout(() => {
+      exitTimeoutMapRef.current.delete(id);
+      setToasts((current) => current.filter((toast) => toast.id !== id));
+    }, TOAST_EXIT_DURATION_MS);
+
+    exitTimeoutMapRef.current.set(id, exitTimeoutId);
   }, []);
 
   const pushToast = useCallback(
@@ -36,7 +60,7 @@ export function useDashboardToasts() {
       const id = nextToastIdRef.current;
       nextToastIdRef.current += 1;
 
-      setToasts((current) => [...current, { id, ...toast }]);
+      setToasts((current) => [...current, { id, exiting: false, ...toast }]);
 
       const timeoutId = window.setTimeout(() => {
         dismissToast(id);
@@ -53,6 +77,10 @@ export function useDashboardToasts() {
         window.clearTimeout(timeoutId);
       }
       timeoutMapRef.current.clear();
+      for (const timeoutId of exitTimeoutMapRef.current.values()) {
+        window.clearTimeout(timeoutId);
+      }
+      exitTimeoutMapRef.current.clear();
     };
   }, []);
 

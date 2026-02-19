@@ -51,15 +51,15 @@ export function PublisherDashboardClient({ adSlots, error }: PublisherDashboardC
       <section
         className={`rounded-2xl border border-[var(--color-border)] p-6 shadow-sm ${overviewPanelStyles.overviewPanel}`}
       >
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-[var(--color-foreground)]">
-              <span className={headingGradientStyles.landingCtaHeadingGradient}>Publisher Dashboard</span>
-            </h1>
-            <p className="mt-1 text-sm text-[var(--color-muted)]">
-              Manage your ad inventory, keep listings current, and track availability at a glance.
-            </p>
-          </div>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-[var(--color-foreground)]">
+            <span className={headingGradientStyles.landingCtaHeadingGradient}>Publisher Dashboard</span>
+          </h1>
+          <p className="mt-1 text-sm text-[var(--color-muted)]">
+            Manage your ad inventory, keep listings current, and track availability at a glance.
+          </p>
+        </div>
+        <div className="mt-4">
           <CreateAdSlotButton onToast={pushToast} />
         </div>
 

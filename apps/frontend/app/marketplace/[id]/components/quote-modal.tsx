@@ -462,7 +462,7 @@ export function QuoteModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm motion-safe:animate-[backdrop-fade-in_180ms_ease-out]"
       role="presentation"
       onClick={(event) => {
         if (submitting) return;
@@ -473,7 +473,7 @@ export function QuoteModal({
     >
       <div
         ref={modalRef}
-        className="w-full max-w-2xl rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-6 shadow-xl"
+        className="w-full max-w-2xl rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-6 shadow-xl motion-safe:animate-[dashboard-dialog-in_200ms_ease-out]"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"

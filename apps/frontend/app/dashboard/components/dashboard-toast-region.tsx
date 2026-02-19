@@ -21,7 +21,11 @@ export function DashboardToastRegion({ toasts, onDismiss }: DashboardToastRegion
         return (
           <div
             key={toast.id}
-            className={`pointer-events-auto rounded-xl border p-3 shadow-lg backdrop-blur-sm motion-safe:animate-[dashboard-toast-in_180ms_ease-out] ${
+            className={`pointer-events-auto rounded-xl border p-3 shadow-lg backdrop-blur-sm ${
+              toast.exiting
+                ? 'motion-safe:animate-[dashboard-toast-out_180ms_ease-in_forwards]'
+                : 'motion-safe:animate-[dashboard-toast-in_180ms_ease-out]'
+            } ${
               isError
                 ? 'border-red-200 bg-red-50/95 text-red-900'
                 : 'border-emerald-200 bg-emerald-50/95 text-emerald-900'

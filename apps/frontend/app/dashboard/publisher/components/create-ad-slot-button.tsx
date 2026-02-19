@@ -69,7 +69,7 @@ export function CreateAdSlotButton({ onToast }: CreateAdSlotButtonProps) {
   const hasErrorBanner = Boolean(state.error);
 
   return (
-    <div className="space-y-3">
+    <div className="flex w-full flex-col gap-3">
       <button
         type="button"
         onClick={() => {
@@ -77,153 +77,166 @@ export function CreateAdSlotButton({ onToast }: CreateAdSlotButtonProps) {
         }}
         aria-expanded={isOpen}
         aria-controls="create-ad-slot-form"
-        className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[var(--color-primary-hover)]"
+        className="self-start rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[var(--color-primary-hover)] sm:self-end"
       >
         {isOpen ? 'Close Form' : 'New Ad Slot'}
       </button>
 
-      {isOpen && (
-        <form
-          id="create-ad-slot-form"
-          action={formAction}
-          className="grid gap-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-5 shadow-sm motion-safe:animate-[dashboard-dialog-in_180ms_ease-out]"
-        >
-          {hasErrorBanner && (
-            <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-2 text-sm text-red-700">
-              {state.error}
-            </div>
-          )}
+      <div
+        className={`grid overflow-hidden transition-[grid-template-rows,opacity] duration-200 ease-out motion-reduce:transition-none ${
+          isOpen ? 'grid-rows-[1fr] opacity-100' : 'pointer-events-none grid-rows-[0fr] opacity-0'
+        }`}
+      >
+        <div className="min-h-0">
+          <form
+            id="create-ad-slot-form"
+            action={formAction}
+            aria-hidden={!isOpen}
+            inert={!isOpen}
+            className="mt-0 grid gap-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-5 shadow-sm sm:grid-cols-2"
+          >
+            <fieldset disabled={!isOpen} className="contents">
+              {hasErrorBanner && (
+                <div
+                  role="alert"
+                  className="rounded-lg border border-red-200 bg-red-50 p-2 text-sm text-red-700 sm:col-span-2"
+                >
+                  {state.error}
+                </div>
+              )}
 
-          <div>
-            <label htmlFor="create-ad-slot-name" className="block text-sm font-medium">
-              Name <span className="text-red-600">*</span>
-            </label>
-            <input
-              ref={nameInputRef}
-              id="create-ad-slot-name"
-              name="name"
-              type="text"
-              required
-              maxLength={120}
-              defaultValue={state.values?.name ?? ''}
-              aria-invalid={Boolean(state.fieldErrors?.name)}
-              aria-describedby={state.fieldErrors?.name ? nameErrorId : undefined}
-              className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
-                state.fieldErrors?.name
-                  ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-                  : 'border-[var(--color-border)] focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]'
-              }`}
-            />
-            {state.fieldErrors?.name && (
-              <p id={nameErrorId} className="mt-1 text-sm text-red-600">
-                {state.fieldErrors.name}
-              </p>
-            )}
-          </div>
+              <div>
+                <label htmlFor="create-ad-slot-name" className="block text-sm font-medium">
+                  Name <span className="text-red-600">*</span>
+                </label>
+                <input
+                  ref={nameInputRef}
+                  id="create-ad-slot-name"
+                  name="name"
+                  type="text"
+                  required
+                  maxLength={120}
+                  defaultValue={state.values?.name ?? ''}
+                  aria-invalid={Boolean(state.fieldErrors?.name)}
+                  aria-describedby={state.fieldErrors?.name ? nameErrorId : undefined}
+                  className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
+                    state.fieldErrors?.name
+                      ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                      : 'border-[var(--color-border)] focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]'
+                  }`}
+                />
+                {state.fieldErrors?.name && (
+                  <p id={nameErrorId} className="mt-1 text-sm text-red-600">
+                    {state.fieldErrors.name}
+                  </p>
+                )}
+              </div>
 
-          <div>
-            <label htmlFor="create-ad-slot-description" className="block text-sm font-medium">
-              Description
-            </label>
-            <textarea
-              id="create-ad-slot-description"
-              name="description"
-              rows={3}
-              defaultValue={state.values?.description ?? ''}
-              maxLength={1000}
-              aria-invalid={Boolean(state.fieldErrors?.description)}
-              aria-describedby={state.fieldErrors?.description ? descriptionErrorId : undefined}
-              className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
-                state.fieldErrors?.description
-                  ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-                  : 'border-[var(--color-border)] focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]'
-              }`}
-            />
-            {state.fieldErrors?.description && (
-              <p id={descriptionErrorId} className="mt-1 text-sm text-red-600">
-                {state.fieldErrors.description}
-              </p>
-            )}
-          </div>
+              <div className="sm:col-span-2">
+                <label htmlFor="create-ad-slot-description" className="block text-sm font-medium">
+                  Description
+                </label>
+                <textarea
+                  id="create-ad-slot-description"
+                  name="description"
+                  rows={3}
+                  defaultValue={state.values?.description ?? ''}
+                  maxLength={1000}
+                  aria-invalid={Boolean(state.fieldErrors?.description)}
+                  aria-describedby={state.fieldErrors?.description ? descriptionErrorId : undefined}
+                  className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
+                    state.fieldErrors?.description
+                      ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                      : 'border-[var(--color-border)] focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]'
+                  }`}
+                />
+                {state.fieldErrors?.description && (
+                  <p id={descriptionErrorId} className="mt-1 text-sm text-red-600">
+                    {state.fieldErrors.description}
+                  </p>
+                )}
+              </div>
 
-          <div>
-            <label htmlFor="create-ad-slot-type" className="block text-sm font-medium">
-              Type
-            </label>
-            <select
-              id="create-ad-slot-type"
-              name="type"
-              defaultValue={state.values?.type ?? 'DISPLAY'}
-              aria-invalid={Boolean(state.fieldErrors?.type)}
-              aria-describedby={state.fieldErrors?.type ? typeErrorId : undefined}
-              className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
-                state.fieldErrors?.type
-                  ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-                  : 'border-[var(--color-border)] focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]'
-              }`}
-            >
-              {AD_SLOT_TYPES.map((slotType) => (
-                <option key={slotType} value={slotType}>
-                  {slotType}
-                </option>
-              ))}
-            </select>
-            {state.fieldErrors?.type && (
-              <p id={typeErrorId} className="mt-1 text-sm text-red-600">
-                {state.fieldErrors.type}
-              </p>
-            )}
-          </div>
+              <div>
+                <label htmlFor="create-ad-slot-type" className="block text-sm font-medium">
+                  Type
+                </label>
+                <select
+                  id="create-ad-slot-type"
+                  name="type"
+                  defaultValue={state.values?.type ?? 'DISPLAY'}
+                  aria-invalid={Boolean(state.fieldErrors?.type)}
+                  aria-describedby={state.fieldErrors?.type ? typeErrorId : undefined}
+                  className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
+                    state.fieldErrors?.type
+                      ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                      : 'border-[var(--color-border)] focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]'
+                  }`}
+                >
+                  {AD_SLOT_TYPES.map((slotType) => (
+                    <option key={slotType} value={slotType}>
+                      {slotType}
+                    </option>
+                  ))}
+                </select>
+                {state.fieldErrors?.type && (
+                  <p id={typeErrorId} className="mt-1 text-sm text-red-600">
+                    {state.fieldErrors.type}
+                  </p>
+                )}
+              </div>
 
-          <div>
-            <label htmlFor="create-ad-slot-base-price" className="block text-sm font-medium">
-              Base Price (monthly) <span className="text-red-600">*</span>
-            </label>
-            <input
-              id="create-ad-slot-base-price"
-              name="basePrice"
-              type="number"
-              required
-              min="0.01"
-              step="0.01"
-              defaultValue={state.values?.basePrice ?? ''}
-              aria-invalid={Boolean(state.fieldErrors?.basePrice)}
-              aria-describedby={state.fieldErrors?.basePrice ? basePriceErrorId : undefined}
-              className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
-                state.fieldErrors?.basePrice
-                  ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-                  : 'border-[var(--color-border)] focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]'
-              }`}
-            />
-            {state.fieldErrors?.basePrice && (
-              <p id={basePriceErrorId} className="mt-1 text-sm text-red-600">
-                {state.fieldErrors.basePrice}
-              </p>
-            )}
-          </div>
+              <div>
+                <label htmlFor="create-ad-slot-base-price" className="block text-sm font-medium">
+                  Base Price (monthly) <span className="text-red-600">*</span>
+                </label>
+                <input
+                  id="create-ad-slot-base-price"
+                  name="basePrice"
+                  type="number"
+                  required
+                  min="0.01"
+                  step="0.01"
+                  defaultValue={state.values?.basePrice ?? ''}
+                  aria-invalid={Boolean(state.fieldErrors?.basePrice)}
+                  aria-describedby={state.fieldErrors?.basePrice ? basePriceErrorId : undefined}
+                  className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 ${
+                    state.fieldErrors?.basePrice
+                      ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                      : 'border-[var(--color-border)] focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]'
+                  }`}
+                />
+                {state.fieldErrors?.basePrice && (
+                  <p id={basePriceErrorId} className="mt-1 text-sm text-red-600">
+                    {state.fieldErrors.basePrice}
+                  </p>
+                )}
+              </div>
 
-          <label className="inline-flex items-center gap-2 text-sm">
-            <input
-              name="isAvailable"
-              type="checkbox"
-              defaultChecked={state.values?.isAvailable ?? true}
-              className="h-4 w-4 rounded border-[var(--color-border)] text-[var(--color-primary)]"
-            />
-            Available for booking
-          </label>
+              <label className="inline-flex items-center gap-2 self-end pb-1 text-sm">
+                <input
+                  name="isAvailable"
+                  type="checkbox"
+                  defaultChecked={state.values?.isAvailable ?? true}
+                  className="h-4 w-4 rounded border-[var(--color-border)] text-[var(--color-primary)]"
+                />
+                Available for booking
+              </label>
 
-          <div className="flex items-center gap-2">
-            <CreateAdSlotSubmitButton />
-            <button
-              type="button"
-              onClick={() => setIsOpen(false)}
-              className="rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm font-medium transition-colors hover:bg-slate-100"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      )}
+              <div className="flex items-center gap-2 sm:col-span-2 sm:justify-end">
+                <CreateAdSlotSubmitButton />
+                <button
+                  type="button"
+                  onClick={() => setIsOpen(false)}
+                  className="rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm font-medium transition-colors hover:bg-slate-100"
+                >
+                  Cancel
+                </button>
+              </div>
+            </fieldset>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }

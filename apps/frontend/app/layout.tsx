@@ -41,7 +41,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body className="flex min-h-screen flex-col antialiased">
         <AnalyticsListener />
         <Nav />
-        <main className="mx-auto w-full max-w-6xl flex-1 p-4">{children}</main>
+        <main className="mx-auto w-full max-w-6xl flex-1 p-4 motion-safe:animate-[page-enter_300ms_ease-out]">
+          {children}
+        </main>
         <Footer />
         {shouldEnableGA ? <GoogleAnalytics gaId={GA_MEASUREMENT_ID} /> : null}
       </body>
