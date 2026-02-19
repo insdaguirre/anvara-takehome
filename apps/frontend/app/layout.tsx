@@ -8,14 +8,26 @@ import { Footer } from './components/footer';
 
 // TODO: Add ErrorBoundary wrapper for graceful error handling
 // TODO: Consider adding a loading.tsx for Suspense boundaries
-// TODO: Add Open Graph metadata for social media sharing
-// TODO: Add Twitter Card metadata
-// TODO: Consider adding favicon and app icons
 
 export const metadata: Metadata = {
-  title: 'Anvara Marketplace',
+  title: {
+    default: 'Anvara Marketplace',
+    template: '%s | Anvara',
+  },
   description: 'Sponsorship marketplace connecting sponsors with publishers',
-  // Missing: openGraph, twitter, icons, viewport, etc.
+  metadataBase: new URL('https://anvara.com'),
+  openGraph: {
+    type: 'website',
+    siteName: 'Anvara',
+    locale: 'en_US',
+  },
+  twitter: {
+    card: 'summary',
+  },
+  icons: {
+    icon: '/favicon.ico',
+    apple: '/apple-touch-icon.png',
+  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

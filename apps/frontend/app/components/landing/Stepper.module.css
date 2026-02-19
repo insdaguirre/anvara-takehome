@@ -1,0 +1,144 @@
+.stepperOuter {
+  display: flex;
+  width: 100%;
+  flex: 1 1 0%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.stepCircleContainer {
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+  max-width: 40rem;
+  border-radius: 1rem;
+  background-color: var(--color-background);
+  box-shadow:
+    0 20px 25px -5px rgb(15 23 42 / 10%),
+    0 10px 10px -5px rgb(15 23 42 / 4%);
+}
+
+.stepIndicatorRow {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  padding: 1.5rem 1.5rem 0;
+}
+
+.stepContentDefault {
+  position: relative;
+  overflow: hidden;
+}
+
+.stepDefault {
+  padding: 0 1.5rem;
+}
+
+.footerContainer {
+  padding: 0 1.5rem 1.5rem;
+}
+
+.footerNav {
+  margin-top: 1.5rem;
+  display: flex;
+}
+
+.spread {
+  justify-content: space-between;
+}
+
+.end {
+  justify-content: flex-end;
+}
+
+.backButton {
+  cursor: pointer;
+  border-radius: 0.375rem;
+  border: 1px solid var(--color-border);
+  padding: 0.5rem 0.75rem;
+  color: var(--color-muted);
+  transition: all 200ms;
+}
+
+.backButton:hover {
+  color: var(--color-foreground);
+}
+
+.inactive {
+  pointer-events: none;
+  opacity: 0.5;
+  color: var(--color-muted);
+}
+
+.nextButton {
+  cursor: pointer;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  background-color: var(--color-primary);
+  padding: 0.5rem 1rem;
+  color: #fff;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  transition: all 200ms;
+}
+
+.nextButton:hover {
+  background-color: var(--color-primary-hover);
+}
+
+.stepIndicator {
+  position: relative;
+  cursor: pointer;
+  outline: none;
+}
+
+.stepIndicatorInner {
+  display: flex;
+  height: 2rem;
+  width: 2rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  font-weight: 600;
+}
+
+.activeDot {
+  height: 0.75rem;
+  width: 0.75rem;
+  border-radius: 9999px;
+  background-color: #fff;
+}
+
+.stepNumber {
+  font-size: 0.875rem;
+}
+
+.stepConnector {
+  position: relative;
+  margin: 0 0.5rem;
+  height: 0.125rem;
+  flex: 1;
+  overflow: hidden;
+  border-radius: 0.25rem;
+  background-color: rgb(100 116 139 / 28%);
+}
+
+.stepConnectorInner {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+}
+
+.checkIcon {
+  height: 1rem;
+  width: 1rem;
+  color: #fff;
+}
+
+@media (max-width: 640px) {
+  .stepCircleContainer {
+    max-width: 100%;
+  }
+}
