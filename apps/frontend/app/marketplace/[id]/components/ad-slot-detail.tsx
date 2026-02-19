@@ -78,6 +78,12 @@ export function AdSlotDetail({ id }: Props) {
   const [returnFocusElement, setReturnFocusElement] = useState<HTMLElement | null>(null);
   const [resetting, setResetting] = useState(false);
   const hasTrackedListingView = useRef(false);
+  const pageLoadTimeRef = useRef<number>(Date.now());
+  const maxScrollDepthRef = useRef<number>(0);
+  const hasTrackedCtaImpressionRef = useRef<{ book: boolean; quote: boolean }>({
+    book: false,
+    quote: false,
+  });
 
   useEffect(() => {
     getMarketplaceAdSlot(id)
@@ -115,13 +121,15 @@ export function AdSlotDetail({ id }: Props) {
       Number(adSlot.basePrice),
       Boolean(adSlot.isAvailable)
     );
-  }, [adSlot]);
+  }, [adSlot?.id]);
 
   useEffect(() => {
     const slotId = adSlot?.id;
     if (!slotId) return;
 
     const viewStartTime = Date.now();
+    pageLoadTimeRef.current = viewStartTime;
+    maxScrollDepthRef.current = 0;
     let hasTrackedScrollDepth = false;
     let hasTrackedViewDuration = false;
 
@@ -134,18 +142,20 @@ export function AdSlotDetail({ id }: Props) {
     };
 
     const handleScroll = () => {
-      if (hasTrackedScrollDepth) return;
-
       const scrollableHeight = document.documentElement.scrollHeight - window.innerHeight;
       if (scrollableHeight <= 0) return;
 
       const currentScroll = window.scrollY || document.documentElement.scrollTop;
       const scrollPercent = (currentScroll / scrollableHeight) * 100;
 
+      if (scrollPercent > maxScrollDepthRef.current) {
+        maxScrollDepthRef.current = scrollPercent;
+      }
+
       if (scrollPercent >= 50) {
+        if (hasTrackedScrollDepth) return;
         hasTrackedScrollDepth = true;
         analytics.listingScrollDepth(slotId, 50);
-        window.removeEventListener('scroll', handleScroll);
       }
     };
 
@@ -173,6 +183,36 @@ export function AdSlotDetail({ id }: Props) {
   }, [adSlot?.id]);
 
   useEffect(() => {
+    if (!adSlot || typeof IntersectionObserver === 'undefined') return;
+
+    hasTrackedCtaImpressionRef.current = { book: false, quote: false };
+    const desktopCtas = document.querySelectorAll<HTMLElement>('[data-cta-sidebar]');
+    if (desktopCtas.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+
+          const ctaType = entry.target.getAttribute('data-cta-type');
+          if (ctaType !== 'book' && ctaType !== 'quote') continue;
+          if (hasTrackedCtaImpressionRef.current[ctaType]) continue;
+
+          hasTrackedCtaImpressionRef.current[ctaType] = true;
+          analytics.ctaImpression(ctaType, 'desktop_sidebar', adSlot.id);
+        }
+      },
+      { threshold: 0.5 }
+    );
+
+    for (const cta of desktopCtas) {
+      observer.observe(cta);
+    }
+
+    return () => observer.disconnect();
+  }, [adSlot?.id]);
+
+  useEffect(() => {
     const footer = document.querySelector('footer');
     if (!footer || typeof IntersectionObserver === 'undefined') return;
 
@@ -188,14 +228,32 @@ export function AdSlotDetail({ id }: Props) {
   }, []);
 
   const handleOpenModal = (event: MouseEvent<HTMLElement>) => {
+    if (!adSlot) return;
+
+    const ctaLocation =
+      event.currentTarget.dataset.location === 'mobile_footer' ? 'mobile_footer' : 'desktop_sidebar';
+    analytics.ctaClick('book', ctaLocation, adSlot.id, adSlot.name, adSlot.isAvailable);
     setReturnFocusElement(event.currentTarget);
     setIsBookingModalOpen(true);
   };
 
   const handleOpenQuoteModal = (event: MouseEvent<HTMLElement>) => {
     if (!adSlot || !adSlot.isAvailable) return;
+
+    const ctaLocation =
+      event.currentTarget.dataset.location === 'mobile_footer' ? 'mobile_footer' : 'desktop_sidebar';
+    analytics.ctaClick('quote', ctaLocation, adSlot.id, adSlot.name, adSlot.isAvailable);
     setReturnFocusElement(event.currentTarget);
     setIsQuoteModalOpen(true);
+  };
+
+  const handleBackToMarketplace = () => {
+    const timeOnPageSeconds = Math.floor((Date.now() - pageLoadTimeRef.current) / 1000);
+    analytics.backToMarketplaceClick(
+      window.location.pathname,
+      timeOnPageSeconds,
+      Math.floor(maxScrollDepthRef.current)
+    );
   };
 
   const handleBookingSuccess = () => {
@@ -239,7 +297,11 @@ export function AdSlotDetail({ id }: Props) {
   if (error || !adSlot) {
     return (
       <div className="space-y-4">
-        <Link href="/marketplace" className="text-[var(--color-primary)] hover:underline">
+        <Link
+          href="/marketplace"
+          onClick={handleBackToMarketplace}
+          className="text-[var(--color-primary)] hover:underline"
+        >
           ← Back to Marketplace
         </Link>
         <div className="rounded border border-red-200 bg-red-50 p-4 text-red-600">
@@ -268,7 +330,11 @@ export function AdSlotDetail({ id }: Props) {
 
   return (
     <div className="space-y-6 pb-24 lg:pb-0">
-      <Link href="/marketplace" className="text-[var(--color-primary)] hover:underline">
+      <Link
+        href="/marketplace"
+        onClick={handleBackToMarketplace}
+        className="text-[var(--color-primary)] hover:underline"
+      >
         ← Back to Marketplace
       </Link>
 
@@ -503,6 +569,9 @@ export function AdSlotDetail({ id }: Props) {
                 <button
                   type="button"
                   onClick={handleOpenModal}
+                  data-location="desktop_sidebar"
+                  data-cta-sidebar
+                  data-cta-type="book"
                   className={`${ctaClassName} bg-[var(--color-primary)] text-white hover:opacity-90`}
                 >
                   Book This Placement
@@ -510,6 +579,9 @@ export function AdSlotDetail({ id }: Props) {
               ) : shouldShowLogin ? (
                 <Link
                   href={loginHref}
+                  onClick={() =>
+                    analytics.ctaClick('login', 'desktop_sidebar', adSlot.id, adSlot.name, adSlot.isAvailable)
+                  }
                   className={`${ctaClassName} bg-[var(--color-primary)] text-white hover:opacity-90`}
                 >
                   Log in to Book
@@ -536,6 +608,9 @@ export function AdSlotDetail({ id }: Props) {
                 <button
                   type="button"
                   onClick={handleOpenQuoteModal}
+                  data-location="desktop_sidebar"
+                  data-cta-sidebar
+                  data-cta-type="quote"
                   className={secondaryCtaClassName}
                 >
                   Request a Quote
@@ -591,6 +666,7 @@ export function AdSlotDetail({ id }: Props) {
                 <button
                   type="button"
                   onClick={handleOpenModal}
+                  data-location="mobile_footer"
                   className={`${ctaClassName} w-full bg-[var(--color-primary)] px-4 py-2 text-sm text-white sm:w-auto`}
                 >
                   Book This Placement
@@ -598,6 +674,9 @@ export function AdSlotDetail({ id }: Props) {
               ) : shouldShowLogin ? (
                 <Link
                   href={loginHref}
+                  onClick={() =>
+                    analytics.ctaClick('login', 'mobile_footer', adSlot.id, adSlot.name, adSlot.isAvailable)
+                  }
                   className={`${ctaClassName} w-full bg-[var(--color-primary)] px-4 py-2 text-sm text-white sm:w-auto`}
                 >
                   Log in to Book
@@ -616,6 +695,7 @@ export function AdSlotDetail({ id }: Props) {
                 <button
                   type="button"
                   onClick={handleOpenQuoteModal}
+                  data-location="mobile_footer"
                   className={`${secondaryCtaClassName} w-full px-4 py-2 text-sm sm:w-auto`}
                 >
                   Request a Quote

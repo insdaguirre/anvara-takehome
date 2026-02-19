@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { analytics } from '@/lib/analytics';
 import { formatPrice } from '@/lib/format';
 
@@ -77,6 +77,14 @@ const INITIAL_VALUES: QuoteFormValues = {
   timeline: '',
   message: '',
 };
+
+type QuoteInteractionField =
+  | 'phone'
+  | 'budget'
+  | 'goals'
+  | 'timeline'
+  | 'attachments'
+  | 'special_requirements';
 
 function parseFieldErrors(value: unknown): Record<string, string> {
   if (!value || typeof value !== 'object') return {};
@@ -163,27 +171,63 @@ export function QuoteModal({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const lastActiveElementRef = useRef<HTMLElement | null>(null);
   const submittingRef = useRef(false);
+  const modalOpenTimeRef = useRef(0);
+  const valuesRef = useRef<QuoteFormValues>(INITIAL_VALUES);
+  const attachmentsRef = useRef<File[]>([]);
+  const interactedOptionalFieldsRef = useRef<Set<QuoteInteractionField>>(new Set());
 
   useEffect(() => {
     submittingRef.current = submitting;
   }, [submitting]);
 
+  const getFilledFieldsCount = useCallback((): number => {
+    const currentValues = valuesRef.current;
+    let count = 0;
+
+    if (currentValues.email.trim()) count += 1;
+    if (currentValues.companyName.trim()) count += 1;
+    if (currentValues.phone.trim()) count += 1;
+    if (currentValues.budget) count += 1;
+    if (currentValues.goals.trim()) count += 1;
+    if (currentValues.timeline) count += 1;
+    if (currentValues.message.trim()) count += 1;
+    if (attachmentsRef.current.length > 0) count += 1;
+
+    return count;
+  }, []);
+
+  const handleModalClose = useCallback(() => {
+    if (modalOpenTimeRef.current > 0 && !submittingRef.current) {
+      const timeInModalSeconds = Math.floor((Date.now() - modalOpenTimeRef.current) / 1000);
+      analytics.quoteCancel(adSlot.id, adSlot.name, timeInModalSeconds, getFilledFieldsCount());
+    }
+
+    modalOpenTimeRef.current = 0;
+    onClose();
+  }, [adSlot.id, adSlot.name, getFilledFieldsCount, onClose]);
+
   useEffect(() => {
     if (!isOpen) return;
 
-    setValues({
+    const initialValues = {
       ...INITIAL_VALUES,
       email: userEmail ?? '',
       companyName: companyName ?? '',
-    });
+    };
+    setValues(initialValues);
+    valuesRef.current = initialValues;
     setAttachments([]);
+    attachmentsRef.current = [];
+    interactedOptionalFieldsRef.current.clear();
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
     setSubmitting(false);
+    submittingRef.current = false;
     setFormError(null);
     setFieldErrors({});
     lastActiveElementRef.current = document.activeElement as HTMLElement | null;
+    modalOpenTimeRef.current = Date.now();
 
     const focusTimeout = window.setTimeout(() => {
       emailInputRef.current?.focus();
@@ -196,7 +240,7 @@ export function QuoteModal({
 
       if (event.key === 'Escape' && !submittingRef.current) {
         event.preventDefault();
-        onClose();
+        handleModalClose();
         return;
       }
 
@@ -232,7 +276,7 @@ export function QuoteModal({
       window.clearTimeout(focusTimeout);
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [adSlot.basePrice, adSlot.id, adSlot.name, companyName, isOpen, onClose, userEmail]);
+  }, [adSlot.basePrice, adSlot.id, adSlot.name, companyName, handleModalClose, isOpen, userEmail]);
 
   useEffect(() => {
     if (isOpen) return;
@@ -241,13 +285,36 @@ export function QuoteModal({
   }, [isOpen, returnFocusElement]);
 
   const handleFieldChange = <K extends keyof QuoteFormValues>(field: K, value: QuoteFormValues[K]) => {
-    setValues((current) => ({ ...current, [field]: value }));
+    setValues((current) => {
+      const next = { ...current, [field]: value };
+      valuesRef.current = next;
+      return next;
+    });
     setFieldErrors((current) => {
       if (!current[field]) return current;
       const next = { ...current };
       delete next[field];
       return next;
     });
+
+    const optionalFields: Array<keyof QuoteFormValues> = ['phone', 'budget', 'goals', 'timeline'];
+    if (
+      optionalFields.includes(field) &&
+      Boolean(value) &&
+      !interactedOptionalFieldsRef.current.has(field as QuoteInteractionField)
+    ) {
+      interactedOptionalFieldsRef.current.add(field as QuoteInteractionField);
+      analytics.quoteFieldInteraction(field as QuoteInteractionField, adSlot.id);
+    }
+
+    if (
+      field === 'message' &&
+      Boolean(value) &&
+      !interactedOptionalFieldsRef.current.has('special_requirements')
+    ) {
+      interactedOptionalFieldsRef.current.add('special_requirements');
+      analytics.quoteFieldInteraction('special_requirements', adSlot.id);
+    }
   };
 
   const handleAttachmentChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -256,17 +323,25 @@ export function QuoteModal({
 
     if (attachmentError) {
       setAttachments([]);
+      attachmentsRef.current = [];
       setFieldErrors((current) => ({ ...current, attachments: attachmentError }));
+      analytics.quoteValidationError('attachments', attachmentError, adSlot.id);
       return;
     }
 
     setAttachments(selectedFiles);
+    attachmentsRef.current = selectedFiles;
     setFieldErrors((current) => {
       if (!current.attachments) return current;
       const next = { ...current };
       delete next.attachments;
       return next;
     });
+
+    if (selectedFiles.length > 0 && !interactedOptionalFieldsRef.current.has('attachments')) {
+      interactedOptionalFieldsRef.current.add('attachments');
+      analytics.quoteFieldInteraction('attachments', adSlot.id);
+    }
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -276,10 +351,12 @@ export function QuoteModal({
     const attachmentError = validateAttachments(attachments);
     if (attachmentError) {
       setFieldErrors((current) => ({ ...current, attachments: attachmentError }));
+      analytics.quoteValidationError('attachments', attachmentError, adSlot.id);
       return;
     }
 
     setSubmitting(true);
+    submittingRef.current = true;
     setFormError(null);
     setFieldErrors({});
 
@@ -338,6 +415,7 @@ export function QuoteModal({
             : `quote_${Date.now()}`;
         onSuccess(quoteId);
         analytics.quoteSuccess(adSlot.id, adSlot.name, Number(adSlot.basePrice), quoteId);
+        modalOpenTimeRef.current = 0;
         onClose();
         return;
       }
@@ -350,6 +428,9 @@ export function QuoteModal({
             : 'Please review the highlighted fields and try again.';
         setFieldErrors(parsedErrors);
         setFormError(errorMessage);
+        for (const [fieldName, message] of Object.entries(parsedErrors)) {
+          analytics.quoteValidationError(fieldName, message, adSlot.id);
+        }
         analytics.quoteFail(adSlot.id, adSlot.name, errorMessage);
         return;
       }
@@ -357,19 +438,23 @@ export function QuoteModal({
       if (response.status === 404) {
         const errorMessage = 'This listing is no longer available. Please browse other placements.';
         setFormError(errorMessage);
+        analytics.quoteErrorShown('api', errorMessage, adSlot.id);
         analytics.quoteFail(adSlot.id, adSlot.name, errorMessage);
         return;
       }
 
       const errorMessage = 'Failed to submit quote request. Please try again.';
       setFormError(errorMessage);
+      analytics.quoteErrorShown('api', errorMessage, adSlot.id);
       analytics.quoteFail(adSlot.id, adSlot.name, errorMessage);
     } catch {
       const errorMessage = 'Failed to submit quote request. Please try again.';
       setFormError(errorMessage);
+      analytics.quoteErrorShown('api', errorMessage, adSlot.id);
       analytics.quoteFail(adSlot.id, adSlot.name, errorMessage);
     } finally {
       setSubmitting(false);
+      submittingRef.current = false;
     }
   };
 
@@ -382,7 +467,7 @@ export function QuoteModal({
       onClick={(event) => {
         if (submitting) return;
         if (event.target === event.currentTarget) {
-          onClose();
+          handleModalClose();
         }
       }}
     >
@@ -405,7 +490,7 @@ export function QuoteModal({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleModalClose}
             disabled={submitting}
             className="rounded p-1 text-[var(--color-muted)] hover:bg-gray-100 hover:text-[var(--color-foreground)] disabled:cursor-not-allowed disabled:opacity-50"
             aria-label="Close quote request modal"

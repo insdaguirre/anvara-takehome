@@ -12,6 +12,8 @@ interface AnalyticsEvent {
 
 const eventQueue: AnalyticsEvent[] = [];
 let cachedSessionId: string | null = null;
+const recentEvents = new Map<string, number>();
+const DEDUPE_WINDOW_MS = 1000;
 
 function createSessionId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -53,13 +55,93 @@ function getReferrer(): string {
   return document.referrer;
 }
 
+function getEntryPage(): string {
+  if (typeof window === 'undefined') return '';
+
+  try {
+    const storedEntryPage = window.sessionStorage.getItem('_entry_page');
+    if (storedEntryPage) return storedEntryPage;
+
+    const currentPath = window.location.pathname;
+    window.sessionStorage.setItem('_entry_page', currentPath);
+    return currentPath;
+  } catch {
+    return '';
+  }
+}
+
+function getReferrerType(): 'internal' | 'external' | 'direct' {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return 'direct';
+
+  const referrer = document.referrer;
+  if (!referrer) return 'direct';
+
+  try {
+    const referrerHost = new URL(referrer).hostname;
+    const currentHost = window.location.hostname;
+    return referrerHost === currentHost ? 'internal' : 'external';
+  } catch {
+    return 'direct';
+  }
+}
+
+function getDedupeKeyValue(value: EventPropertyValue | undefined): string {
+  if (value === null || typeof value === 'undefined') return '';
+  return String(value);
+}
+
+function buildDedupeKey(event: string, properties: EventProperties): string {
+  if (event === 'navigation') {
+    return `${event}:${getDedupeKeyValue(properties.from_page)}:${getDedupeKeyValue(properties.to_page)}:${getDedupeKeyValue(properties.navigation_type)}`;
+  }
+
+  return `${event}:${getDedupeKeyValue(properties.slot_id)}:${getDedupeKeyValue(properties.cta_type)}`;
+}
+
+function shouldDedupeEvent(eventKey: string): boolean {
+  const now = Date.now();
+  const lastFired = recentEvents.get(eventKey);
+
+  if (typeof lastFired === 'number' && now - lastFired < DEDUPE_WINDOW_MS) {
+    return true;
+  }
+
+  recentEvents.set(eventKey, now);
+
+  if (recentEvents.size > 100) {
+    const cutoff = now - DEDUPE_WINDOW_MS * 5;
+    for (const [key, timestamp] of recentEvents.entries()) {
+      if (timestamp < cutoff) {
+        recentEvents.delete(key);
+      }
+    }
+  }
+
+  return false;
+}
+
 export function track(event: string, properties: EventProperties = {}): void {
+  const dedupeKey = buildDedupeKey(event, properties);
+  if (shouldDedupeEvent(dedupeKey)) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[Analytics] [DEDUPE] ${event}`, properties);
+    }
+    return;
+  }
+
+  const shouldAttachAttribution = event.endsWith('_submit') || event.endsWith('_success');
   const analyticsEvent: AnalyticsEvent = {
     event,
     properties: {
       ...properties,
       path: getPath(),
       referrer: getReferrer(),
+      ...(shouldAttachAttribution
+        ? {
+            entry_page: getEntryPage(),
+            referrer_type: getReferrerType(),
+          }
+        : {}),
     },
     timestamp: new Date().toISOString(),
     sessionId: getSessionId(),
@@ -123,6 +205,22 @@ export const analytics = {
   bookingFail: (slotId: string, slotName: string, error: string) =>
     track('booking_fail', { slot_id: slotId, slot_name: slotName, error }),
 
+  bookingCancel: (
+    slotId: string,
+    slotName: string,
+    timeInModalSeconds: number,
+    messageFilled: boolean
+  ) =>
+    track('booking_cancel', {
+      slot_id: slotId,
+      slot_name: slotName,
+      time_in_modal_seconds: timeInModalSeconds,
+      message_filled: messageFilled,
+    }),
+
+  bookingErrorShown: (errorType: 'validation' | 'api', errorMessage: string, slotId: string) =>
+    track('booking_error_shown', { error_type: errorType, error_message: errorMessage, slot_id: slotId }),
+
   quoteStart: (slotId: string, slotName: string, price: number) =>
     track('quote_start', { slot_id: slotId, slot_name: slotName, price }),
 
@@ -163,6 +261,34 @@ export const analytics = {
   quoteFail: (slotId: string, slotName: string, error: string) =>
     track('quote_fail', { slot_id: slotId, slot_name: slotName, error }),
 
+  quoteCancel: (
+    slotId: string,
+    slotName: string,
+    timeInModalSeconds: number,
+    fieldsFilledCount: number
+  ) =>
+    track('quote_cancel', {
+      slot_id: slotId,
+      slot_name: slotName,
+      time_in_modal_seconds: timeInModalSeconds,
+      fields_filled_count: fieldsFilledCount,
+    }),
+
+  quoteFieldInteraction: (
+    fieldName: 'phone' | 'budget' | 'goals' | 'timeline' | 'attachments' | 'special_requirements',
+    slotId: string
+  ) => track('quote_field_interaction', { field_name: fieldName, slot_id: slotId }),
+
+  quoteValidationError: (fieldName: string, errorMessage: string, slotId: string) =>
+    track('quote_validation_error', {
+      field_name: fieldName,
+      error_message: errorMessage,
+      slot_id: slotId,
+    }),
+
+  quoteErrorShown: (errorType: 'validation' | 'api', errorMessage: string, slotId: string) =>
+    track('quote_error_shown', { error_type: errorType, error_message: errorMessage, slot_id: slotId }),
+
   filterApply: (filterType: string, filterValue: string) =>
     track('filter_apply', { filter_type: filterType, filter_value: filterValue }),
 
@@ -178,7 +304,11 @@ export const analytics = {
 
   newsletterSignupFail: (error: string) => track('newsletter_signup_fail', { error }),
 
-  navigation: (fromPage: string, toPage: string, navigationType: 'spa_route_change') =>
+  navigation: (
+    fromPage: string,
+    toPage: string,
+    navigationType: 'spa_route_change' | 'back_forward'
+  ) =>
     track('navigation', { from_page: fromPage, to_page: toPage, navigation_type: navigationType }),
 
   marketplaceToDetailNavigation: (listingId: string) =>
@@ -189,6 +319,43 @@ export const analytics = {
 
   listingViewDuration: (slotId: string, durationSeconds: number) =>
     track('listing_view_duration', { slot_id: slotId, duration_seconds: durationSeconds }),
+
+  ctaClick: (
+    ctaType: 'book' | 'quote' | 'login',
+    ctaLocation: 'desktop_sidebar' | 'mobile_footer',
+    slotId: string,
+    slotName: string,
+    isAvailable: boolean
+  ) =>
+    track('cta_click', {
+      cta_type: ctaType,
+      cta_location: ctaLocation,
+      slot_id: slotId,
+      slot_name: slotName,
+      is_available: isAvailable,
+    }),
+
+  ctaImpression: (
+    ctaType: 'book' | 'quote',
+    ctaLocation: 'desktop_sidebar' | 'mobile_footer',
+    slotId: string
+  ) =>
+    track('cta_impression', {
+      cta_type: ctaType,
+      cta_location: ctaLocation,
+      slot_id: slotId,
+    }),
+
+  backToMarketplaceClick: (
+    fromPage: string,
+    timeOnPageSeconds: number,
+    scrollDepthPercent: number
+  ) =>
+    track('back_to_marketplace_click', {
+      from_page: fromPage,
+      time_on_page_seconds: timeOnPageSeconds,
+      scroll_depth_percent: scrollDepthPercent,
+    }),
 };
 
 export { eventQueue };

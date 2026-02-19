@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { analytics } from '@/lib/analytics';
 
-function buildPage(pathname: string, searchParams: { toString(): string }): string {
-  const query = searchParams.toString();
+function buildPage(pathname: string): string {
+  if (typeof window === 'undefined') return pathname;
+  const query = window.location.search.replace(/^\?/, '');
   return query ? `${pathname}?${query}` : pathname;
 }
 
@@ -16,12 +17,23 @@ function getMarketplaceListingId(pathname: string): string | null {
 
 export function AnalyticsListener() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const previousPageRef = useRef<string | null>(null);
   const previousPathnameRef = useRef<string | null>(null);
+  const pendingPopstateRef = useRef(false);
+  const lastNavigationKeyRef = useRef<string | null>(null);
+  const lastTransitionRef = useRef<{ from: string; to: string } | null>(null);
 
   useEffect(() => {
-    const currentPage = buildPage(pathname, searchParams);
+    const handlePopstate = () => {
+      pendingPopstateRef.current = true;
+    };
+
+    window.addEventListener('popstate', handlePopstate);
+    return () => window.removeEventListener('popstate', handlePopstate);
+  }, []);
+
+  useEffect(() => {
+    const currentPage = buildPage(pathname);
     const previousPage = previousPageRef.current;
     const previousPathname = previousPathnameRef.current;
 
@@ -35,7 +47,24 @@ export function AnalyticsListener() {
       return;
     }
 
-    analytics.navigation(previousPage, currentPage, 'spa_route_change');
+    const lastTransition = lastTransitionRef.current;
+    const isReverseTransition = Boolean(
+      lastTransition &&
+        lastTransition.from === currentPage &&
+        lastTransition.to === previousPage
+    );
+    const navigationType =
+      pendingPopstateRef.current || isReverseTransition ? 'back_forward' : 'spa_route_change';
+    pendingPopstateRef.current = false;
+    const navigationKey = `${previousPage}->${currentPage}:${navigationType}`;
+    if (lastNavigationKeyRef.current === navigationKey) {
+      previousPageRef.current = currentPage;
+      previousPathnameRef.current = pathname;
+      return;
+    }
+    lastNavigationKeyRef.current = navigationKey;
+
+    analytics.navigation(previousPage, currentPage, navigationType);
 
     if (previousPathname === '/marketplace') {
       const listingId = getMarketplaceListingId(pathname);
@@ -44,9 +73,10 @@ export function AnalyticsListener() {
       }
     }
 
+    lastTransitionRef.current = { from: previousPage, to: currentPage };
     previousPageRef.current = currentPage;
     previousPathnameRef.current = pathname;
-  }, [pathname, searchParams]);
+  }, [pathname]);
 
   return null;
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { analytics } from '@/lib/analytics';
 import { formatPrice } from '@/lib/format';
 
@@ -38,14 +38,39 @@ export function BookingModal({
   const companyInputRef = useRef<HTMLInputElement | null>(null);
   const messageRef = useRef<HTMLTextAreaElement | null>(null);
   const lastActiveElementRef = useRef<HTMLElement | null>(null);
+  const modalOpenTimeRef = useRef(0);
+  const bookingRef = useRef(false);
+  const messageValueRef = useRef('');
+
+  useEffect(() => {
+    bookingRef.current = booking;
+  }, [booking]);
+
+  const handleModalClose = useCallback(() => {
+    if (modalOpenTimeRef.current > 0 && !bookingRef.current) {
+      const timeInModalSeconds = Math.floor((Date.now() - modalOpenTimeRef.current) / 1000);
+      analytics.bookingCancel(
+        adSlot.id,
+        adSlot.name,
+        timeInModalSeconds,
+        Boolean(messageValueRef.current.trim())
+      );
+    }
+
+    modalOpenTimeRef.current = 0;
+    onClose();
+  }, [adSlot.id, adSlot.name, onClose]);
 
   useEffect(() => {
     if (!isOpen) return;
 
     setMessage('');
+    messageValueRef.current = '';
     setError(null);
     setBooking(false);
+    bookingRef.current = false;
     lastActiveElementRef.current = document.activeElement as HTMLElement | null;
+    modalOpenTimeRef.current = Date.now();
 
     const focusTimeout = window.setTimeout(() => {
       if (sponsorName && companyInputRef.current) {
@@ -60,7 +85,7 @@ export function BookingModal({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        onClose();
+        handleModalClose();
       }
     };
 
@@ -70,7 +95,7 @@ export function BookingModal({
       window.clearTimeout(focusTimeout);
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [adSlot.basePrice, adSlot.id, adSlot.name, isOpen, onClose, sponsorName]);
+  }, [adSlot.basePrice, adSlot.id, adSlot.name, handleModalClose, isOpen, sponsorName]);
 
   useEffect(() => {
     if (isOpen) return;
@@ -82,6 +107,7 @@ export function BookingModal({
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setBooking(true);
+    bookingRef.current = true;
     setError(null);
 
     analytics.bookingSubmit(adSlot.id, adSlot.name, Number(adSlot.basePrice), Boolean(message.trim()));
@@ -113,15 +139,19 @@ export function BookingModal({
 
       analytics.bookingSuccess(adSlot.id, adSlot.name, Number(adSlot.basePrice));
       setMessage('');
+      messageValueRef.current = '';
+      modalOpenTimeRef.current = 0;
       onSuccess();
       onClose();
     } catch (submitError) {
       const errorMessage =
         submitError instanceof Error ? submitError.message : 'Failed to book placement';
       setError(errorMessage);
+      analytics.bookingErrorShown('api', errorMessage, adSlot.id);
       analytics.bookingFail(adSlot.id, adSlot.name, errorMessage);
     } finally {
       setBooking(false);
+      bookingRef.current = false;
     }
   };
 
@@ -130,7 +160,7 @@ export function BookingModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
-      onClick={onClose}
+      onClick={handleModalClose}
       role="presentation"
     >
       <div
@@ -151,7 +181,7 @@ export function BookingModal({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleModalClose}
             className="rounded p-1 text-[var(--color-muted)] hover:bg-gray-100 hover:text-[var(--color-foreground)]"
             aria-label="Close booking modal"
           >
@@ -173,7 +203,7 @@ export function BookingModal({
                 ref={companyInputRef}
                 value={sponsorName}
                 readOnly
-                className="w-full rounded-lg border border-[var(--color-border)] bg-gray-50 px-3 py-2 text-sm text-[var(--color-foreground)]"
+                className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-foreground)]"
               />
             </div>
           )}
@@ -189,7 +219,10 @@ export function BookingModal({
               id="booking-message"
               ref={messageRef}
               value={message}
-              onChange={(event) => setMessage(event.target.value)}
+              onChange={(event) => {
+                setMessage(event.target.value);
+                messageValueRef.current = event.target.value;
+              }}
               rows={4}
               placeholder="e.g., We're launching our developer tool and want to reach your audience."
               className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-[var(--color-foreground)] placeholder:text-[var(--color-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
