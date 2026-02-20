@@ -62,14 +62,14 @@ function getDebugVariant<K extends ABTestKey>(testKey: K): ABTestVariant<K> | nu
   if (isAllowedVariant(testKey, queryVariant)) {
     try {
       window.localStorage.setItem(storageKey, queryVariant);
-    } catch {}
+    } catch { /* localStorage may be unavailable (private browsing, storage quota) */ }
     return queryVariant;
   }
 
   let storedVariant: string | null = null;
   try {
     storedVariant = window.localStorage.getItem(storageKey);
-  } catch {}
+  } catch { /* localStorage may be unavailable */ }
 
   if (isAllowedVariant(testKey, storedVariant)) {
     return storedVariant;
@@ -78,7 +78,7 @@ function getDebugVariant<K extends ABTestKey>(testKey: K): ABTestVariant<K> | nu
   if (storedVariant) {
     try {
       window.localStorage.removeItem(storageKey);
-    } catch {}
+    } catch { /* localStorage may be unavailable */ }
   }
 
   return null;

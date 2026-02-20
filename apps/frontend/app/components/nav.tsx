@@ -23,6 +23,7 @@ export function Nav() {
   useBodyScrollLock(isMobileMenuOpen);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 
@@ -38,6 +39,7 @@ export function Nav() {
         .then((data) => setRole(data.role))
         .catch(() => setRole(null));
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRole(null);
     }
   }, [user?.id]);

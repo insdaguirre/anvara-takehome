@@ -153,6 +153,7 @@ export function track(event: string, properties: EventProperties = {}): void {
   const dedupeKey = buildDedupeKey(event, properties);
   if (shouldDedupeEvent(dedupeKey)) {
     if (globalThis.process?.env.NODE_ENV === 'development') {
+      // eslint-disable-next-line no-console
       console.log(`[Analytics] [DEDUPE] ${event}`, properties);
     }
     return;
@@ -177,6 +178,7 @@ export function track(event: string, properties: EventProperties = {}): void {
   };
 
   if (globalThis.process?.env.NODE_ENV === 'development') {
+    // eslint-disable-next-line no-console
     console.log(`[Analytics] ${event}`, analyticsEvent.properties);
   }
 
