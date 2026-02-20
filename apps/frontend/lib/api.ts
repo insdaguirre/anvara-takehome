@@ -117,7 +117,45 @@ export const createAdSlot = (data: unknown) =>
   api('/api/ad-slots', { method: 'POST', body: JSON.stringify(data) });
 
 // Public marketplace routes
-export const getMarketplaceAdSlots = () => api<unknown[]>('/api/marketplace/ad-slots');
+export interface MarketplacePagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface PaginatedMarketplaceResponse<T> {
+  data: T[];
+  pagination: MarketplacePagination;
+}
+
+export interface MarketplaceAdSlotParams {
+  page?: number;
+  limit?: number;
+  type?: string;
+  category?: string;
+  available?: boolean;
+  search?: string;
+  sortBy?: string;
+}
+
+export function getMarketplaceAdSlots<T = unknown>(
+  params: MarketplaceAdSlotParams = {}
+): Promise<PaginatedMarketplaceResponse<T>> {
+  const qs = new URLSearchParams();
+  if (params.page !== undefined) qs.set('page', String(params.page));
+  if (params.limit !== undefined) qs.set('limit', String(params.limit));
+  if (params.type && params.type !== 'ALL') qs.set('type', params.type);
+  if (params.category && params.category !== 'ALL') qs.set('category', params.category);
+  if (params.available) qs.set('available', 'true');
+  if (params.search?.trim()) qs.set('search', params.search.trim());
+  if (params.sortBy) qs.set('sortBy', params.sortBy);
+  const query = qs.toString();
+  return api<PaginatedMarketplaceResponse<T>>(
+    `/api/marketplace/ad-slots${query ? `?${query}` : ''}`
+  );
+}
+
 export const getMarketplaceAdSlot = (id: string) => api<unknown>(`/api/marketplace/ad-slots/${id}`);
 
 // Placements

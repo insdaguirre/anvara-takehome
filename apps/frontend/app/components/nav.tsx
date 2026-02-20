@@ -175,7 +175,7 @@ export function Nav() {
           items={menuItems}
           socialItems={[]}
           displaySocials={false}
-          displayItemNumbering={true}
+          displayItemNumbering={false}
           menuButtonColor="var(--color-foreground)"
           openMenuButtonColor="#ffffff"
           changeMenuColorOnOpen={true}

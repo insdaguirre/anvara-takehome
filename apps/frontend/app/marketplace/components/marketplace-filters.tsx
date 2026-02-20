@@ -30,8 +30,6 @@ export interface FilterState {
 interface MarketplaceFiltersProps {
   filters: FilterState;
   onChange(next: FilterState): void;
-  resultCount?: number;
-  totalCount?: number;
 }
 
 export const defaultFilters: FilterState = {
@@ -52,18 +50,9 @@ function isDefaultFilters(filters: FilterState): boolean {
   );
 }
 
-export function MarketplaceFilters({
-  filters,
-  onChange,
-  resultCount,
-  totalCount,
-}: MarketplaceFiltersProps) {
+export function MarketplaceFilters({ filters, onChange }: MarketplaceFiltersProps) {
   const hasMountedRef = useRef(false);
-  const latestResultCountRef = useRef(resultCount ?? 0);
-
-  useEffect(() => {
-    latestResultCountRef.current = resultCount ?? 0;
-  }, [resultCount]);
+  const latestResultCountRef = useRef(0);
 
   useEffect(() => {
     if (!hasMountedRef.current) {
@@ -183,14 +172,8 @@ export function MarketplaceFilters({
         />
       </div>
 
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-[var(--color-muted)]">
-          {typeof resultCount === 'number' && typeof totalCount === 'number'
-            ? `Showing ${resultCount} of ${totalCount} ad slots`
-            : 'Browse ad slots'}
-        </p>
-
-        {!isDefaultFilters(filters) && (
+      {!isDefaultFilters(filters) && (
+        <div className="flex justify-end">
           <button
             type="button"
             onClick={() => onChange(defaultFilters)}
@@ -198,8 +181,8 @@ export function MarketplaceFilters({
           >
             Clear all filters
           </button>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
