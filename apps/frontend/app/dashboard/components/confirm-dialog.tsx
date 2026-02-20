@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useId, useRef } from 'react';
+import { useBodyScrollLock } from '@/hooks/use-body-scroll-lock';
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -30,6 +31,8 @@ export function ConfirmDialog({
   const lastActiveElementRef = useRef<HTMLElement | null>(null);
   const titleId = useId();
   const descriptionId = useId();
+
+  useBodyScrollLock(isOpen);
 
   useEffect(() => {
     if (!isOpen) {
@@ -88,7 +91,7 @@ export function ConfirmDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-end justify-center overflow-hidden bg-slate-900/45 p-0 backdrop-blur-sm lg:items-center lg:p-4"
       role="presentation"
       onClick={(event) => {
         if (isPending) return;
@@ -103,7 +106,7 @@ export function ConfirmDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
-        className="w-full max-w-md rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-6 shadow-xl motion-safe:animate-[dashboard-dialog-in_180ms_ease-out]"
+        className="flex h-full w-full flex-col overflow-y-auto bg-[var(--color-background)] p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] motion-safe:animate-[dashboard-dialog-in_180ms_ease-out] lg:h-auto lg:max-w-md lg:rounded-2xl lg:border lg:border-[var(--color-border)] lg:p-6 lg:shadow-xl"
       >
         <h2 id={titleId} className="text-lg font-semibold text-[var(--color-foreground)]">
           {title}
@@ -118,7 +121,7 @@ export function ConfirmDialog({
             type="button"
             onClick={onCancel}
             disabled={isPending}
-            className="rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+            className="min-h-[44px] rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-foreground)] transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {cancelLabel}
           </button>
@@ -126,7 +129,7 @@ export function ConfirmDialog({
             type="button"
             onClick={onConfirm}
             disabled={isPending}
-            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-60"
+            className="min-h-[44px] rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isPending ? 'Processing...' : confirmLabel}
           </button>

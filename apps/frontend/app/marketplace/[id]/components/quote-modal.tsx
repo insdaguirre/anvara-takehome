@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { InlineNotice } from '@/app/components/InlineNotice';
+import { useBodyScrollLock } from '@/hooks/use-body-scroll-lock';
 import { analytics } from '@/lib/analytics';
 import { formatPrice } from '@/lib/format';
 
@@ -176,6 +177,8 @@ export function QuoteModal({
   const valuesRef = useRef<QuoteFormValues>(INITIAL_VALUES);
   const attachmentsRef = useRef<File[]>([]);
   const interactedOptionalFieldsRef = useRef<Set<QuoteInteractionField>>(new Set());
+
+  useBodyScrollLock(isOpen);
 
   useEffect(() => {
     submittingRef.current = submitting;
@@ -463,7 +466,7 @@ export function QuoteModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm motion-safe:animate-[backdrop-fade-in_180ms_ease-out]"
+      className="fixed inset-0 z-50 flex items-end justify-center overflow-hidden bg-black/50 p-0 backdrop-blur-sm motion-safe:animate-[backdrop-fade-in_180ms_ease-out] lg:items-center lg:p-4"
       role="presentation"
       onClick={(event) => {
         if (submitting) return;
@@ -474,7 +477,7 @@ export function QuoteModal({
     >
       <div
         ref={modalRef}
-        className="w-full max-w-2xl rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-6 shadow-xl motion-safe:animate-[dashboard-dialog-in_200ms_ease-out]"
+        className="flex h-full w-full flex-col overflow-y-auto bg-[var(--color-background)] p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] motion-safe:animate-[dashboard-dialog-in_200ms_ease-out] sm:p-5 lg:h-auto lg:max-h-[90dvh] lg:max-w-2xl lg:rounded-xl lg:border lg:border-[var(--color-border)] lg:p-6 lg:shadow-xl"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -493,7 +496,7 @@ export function QuoteModal({
             type="button"
             onClick={handleModalClose}
             disabled={submitting}
-            className="rounded p-1 text-[var(--color-muted)] hover:bg-gray-100 hover:text-[var(--color-foreground)] disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex h-11 w-11 items-center justify-center rounded text-[var(--color-muted)] hover:bg-gray-100 hover:text-[var(--color-foreground)] disabled:cursor-not-allowed disabled:opacity-50"
             aria-label="Close quote request modal"
           >
             ✕

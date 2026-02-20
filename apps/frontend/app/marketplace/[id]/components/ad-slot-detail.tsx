@@ -459,7 +459,7 @@ export function AdSlotDetail({ id }: Props) {
       <Link
         href="/marketplace"
         onClick={handleBackToMarketplace}
-        className="text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] hover:underline dark:text-white dark:hover:text-white/80"
+        className="text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] hover:underline"
       >
         ← Back to Marketplace
       </Link>
@@ -764,7 +764,7 @@ export function AdSlotDetail({ id }: Props) {
       </div>
 
       {!bookingSuccess && !quoteSuccess && !isFooterVisible && (
-        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-[var(--color-border)] bg-[var(--color-background)] px-4 py-3 shadow-lg lg:hidden">
+        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-[var(--color-border)] bg-[var(--color-background)] px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-lg lg:hidden">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
             <div>
               <p className="text-lg font-semibold">{formatPrice(adSlot.basePrice)}</p>

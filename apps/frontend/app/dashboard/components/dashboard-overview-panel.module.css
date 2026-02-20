@@ -2,15 +2,15 @@
   background: linear-gradient(to bottom right, rgb(240 249 255), rgb(255 255 255), rgb(255 255 255));
 }
 
-:global(html.dark) .overviewPanel {
+:global(html.dark:not([data-theme='light'])) .overviewPanel,
+:global(html[data-theme='dark']) .overviewPanel {
   background: linear-gradient(135deg, #071533 0%, #081d44 52%, #0a2455 100%);
   border-color: #2a436f;
 }
 
-:global(html.dark) .statCard {
-  --color-background: #ffffff;
-  --color-foreground: #0f172a;
-  --color-muted: #52627d;
-  --color-border: #d9e2f1;
-  color: var(--color-foreground);
+@media (prefers-color-scheme: dark) {
+  :global(html:not([data-theme]):not(.dark)) .overviewPanel {
+    background: linear-gradient(135deg, #071533 0%, #081d44 52%, #0a2455 100%);
+    border-color: #2a436f;
+  }
 }
