@@ -138,7 +138,7 @@ export function CampaignCard({ campaign, onToast }: CampaignCardProps) {
   const statusErrorId = `${editStatusId}-error`;
 
   return (
-    <article className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+    <article className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:scale-[0.99] motion-reduce:active:scale-100">
       <div className="mb-3 flex items-start justify-between gap-2">
         <h3 className="text-base font-semibold text-[var(--color-foreground)]">{campaign.name}</h3>
         <span
@@ -152,7 +152,7 @@ export function CampaignCard({ campaign, onToast }: CampaignCardProps) {
         <p className="mb-4 line-clamp-2 text-sm text-[var(--color-muted)]">{campaign.description}</p>
       )}
 
-      <div className="mb-3 rounded-lg bg-slate-50 p-3">
+      <div className="mb-3 rounded-lg bg-[var(--color-surface-muted)] p-3">
         <div className="flex justify-between text-sm">
           <span className="text-[var(--color-muted)]">Budget</span>
           <span>{formatPrice(Number(campaign.spent))} / {formatPrice(Number(campaign.budget))}</span>

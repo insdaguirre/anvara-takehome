@@ -19,7 +19,8 @@ changeMenuColorOnOpen = true,
 isFixed = false,
 closeOnClickAway = true,
 onMenuOpen,
-onMenuClose
+onMenuClose,
+rightSlot
 }) => {
 const [open, setOpen] = useState(false);
 const openRef = useRef(false);
@@ -48,11 +49,9 @@ const ctx = gsap.context(() => {
 const panel = panelRef.current;
 const blurLayer = blurLayerRef.current;
 const preContainer = preLayersRef.current;
-const plusH = plusHRef.current;
-const plusV = plusVRef.current;
 const icon = iconRef.current;
 const textInner = textInnerRef.current;
-if (!panel || !plusH || !plusV || !icon || !textInner) return;
+if (!panel || !icon || !textInner) return;
 
   let preLayers = [];
   if (preContainer) {
@@ -62,8 +61,6 @@ if (!panel || !plusH || !plusV || !icon || !textInner) return;
 
   const offscreen = position === 'left' ? -100 : 100;
   gsap.set([panel, blurLayer, ...preLayers].filter(Boolean), { xPercent: offscreen });
-  gsap.set(plusH, { transformOrigin: '50% 50%', rotate: 0 });
-  gsap.set(plusV, { transformOrigin: '50% 50%', rotate: 90 });
   gsap.set(icon, { rotate: 0, transformOrigin: '50% 50%' });
   gsap.set(textInner, { yPercent: 0 });
   if (toggleBtnRef.current) gsap.set(toggleBtnRef.current, { color: menuButtonColor });
@@ -261,31 +258,32 @@ spinTweenRef.current = gsap.to(icon, { rotate: 0, duration: 0.35, ease: 'power3.
 
 const animateColor = useCallback(
 opening => {
-const btn = toggleBtnRef.current;
-if (!btn) return;
+const colorTarget = toggleBtnRef.current;
+if (!colorTarget) return;
 colorTweenRef.current?.kill();
 if (changeMenuColorOnOpen) {
 const targetColor = opening ? openMenuButtonColor : menuButtonColor;
-colorTweenRef.current = gsap.to(btn, {
+colorTweenRef.current = gsap.to(colorTarget, {
 color: targetColor,
 delay: 0.18,
 duration: 0.3,
 ease: 'power2.out'
 });
 } else {
-gsap.set(btn, { color: menuButtonColor });
+gsap.set(colorTarget, { color: menuButtonColor });
 }
 },
 [openMenuButtonColor, menuButtonColor, changeMenuColorOnOpen]
 );
 
 React.useEffect(() => {
-if (toggleBtnRef.current) {
+const colorTarget = toggleBtnRef.current;
+if (colorTarget) {
 if (changeMenuColorOnOpen) {
 const targetColor = openRef.current ? openMenuButtonColor : menuButtonColor;
-gsap.set(toggleBtnRef.current, { color: targetColor });
+gsap.set(colorTarget, { color: targetColor });
 } else {
-gsap.set(toggleBtnRef.current, { color: menuButtonColor });
+gsap.set(colorTarget, { color: menuButtonColor });
 }
 }
 }, [changeMenuColorOnOpen, menuButtonColor, openMenuButtonColor]);
@@ -427,6 +425,9 @@ width={110}
 height={24}
 />
 </a>
+<div className="flex-1" />
+<div className="sm-right-cluster">
+<div className="sm-right-slot">{rightSlot}</div>
 <button
 ref={toggleBtnRef}
 className="sm-toggle"
@@ -436,7 +437,7 @@ aria-controls="staggered-menu-panel"
 onClick={toggleMenu}
 type="button"
 >
-<span ref={textWrapRef} className="sm-toggle-textWrap" aria-hidden="true">
+<span ref={textWrapRef} className="sm-toggle-textWrap sm-toggle-label" aria-hidden="true">
 <span ref={textInnerRef} className="sm-toggle-textInner">
 {textLines.map((l, i) => (
 <span className="sm-toggle-line" key={i}>
@@ -445,11 +446,11 @@ type="button"
 ))}
 </span>
 </span>
-<span ref={iconRef} className="sm-icon" aria-hidden="true">
-<span ref={plusHRef} className="sm-icon-line" />
-<span ref={plusVRef} className="sm-icon-line sm-icon-line-v" />
+<span ref={iconRef} className="sm-toggle-icon" aria-hidden="true">
+{open ? "\u00d7" : "+"}
 </span>
 </button>
+</div>
 </header>
 
   <aside id="staggered-menu-panel" ref={panelRef} className="staggered-menu-panel" aria-hidden={!open}>

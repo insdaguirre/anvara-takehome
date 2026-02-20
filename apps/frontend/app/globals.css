@@ -22,6 +22,7 @@
   --color-foreground: #0f172a;
   --color-muted: #64748b;
   --color-border: #e2e8f0;
+  --color-surface-muted: #f8fafc;
   --landing-overlay-rgb: 255 255 255;
   --landing-support-text-rgb: 255 255 255;
   --landing-feature-label-rgb: 99 102 241;
@@ -38,32 +39,65 @@
   --spacing-container: 1rem;
 }
 
-/* Light mode - Explicit definition for manual toggle */
-html.light,
-html:not(.dark) {
-  --color-background: #ffffff;
-  --color-foreground: #0f172a;
-  --color-muted: #64748b;
-  --color-border: #e2e8f0;
-  --landing-overlay-rgb: 255 255 255;
-  --landing-support-text-rgb: 203 213 225;
-  --landing-feature-label-rgb: 99 102 241;
-  --marketplace-overlay-rgb: 255 255 255;
-}
-
-/* Dark mode support - Manual toggle with localStorage persistence */
-html.dark {
+/* Dark tokens for class-based and attribute-based theming. */
+:root.dark:not([data-theme='light']),
+:root[data-theme='dark'] {
   --color-background: #0f172a;
   --color-foreground: #f8fafc;
   --color-muted: #94a3b8;
   --color-border: #334155;
+  --color-surface-muted: #1e293b;
   --landing-overlay-rgb: 0 0 0;
   --landing-support-text-rgb: 148 163 184;
   --landing-feature-label-rgb: 148 163 184;
   --marketplace-overlay-rgb: 0 0 0;
 }
 
+/* Follow system preference only when there is no explicit user choice. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]):not(.dark) {
+    --color-background: #0f172a;
+    --color-foreground: #f8fafc;
+    --color-muted: #94a3b8;
+    --color-border: #334155;
+    --color-surface-muted: #1e293b;
+    --landing-overlay-rgb: 0 0 0;
+    --landing-support-text-rgb: 148 163 184;
+    --landing-feature-label-rgb: 148 163 184;
+    --marketplace-overlay-rgb: 0 0 0;
+  }
+}
+
+/* Explicit light choice always wins. */
+:root[data-theme='light'] {
+  --color-background: #ffffff;
+  --color-foreground: #0f172a;
+  --color-muted: #64748b;
+  --color-border: #e2e8f0;
+  --color-surface-muted: #f8fafc;
+  --landing-overlay-rgb: 255 255 255;
+  --landing-support-text-rgb: 203 213 225;
+  --landing-feature-label-rgb: 99 102 241;
+  --marketplace-overlay-rgb: 255 255 255;
+}
+
 /* Base styles */
+html {
+  overflow-x: hidden;
+  color-scheme: light;
+}
+
+html.dark:not([data-theme='light']),
+html[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]):not(.dark) {
+    color-scheme: dark;
+  }
+}
+
 body {
   background-color: var(--color-background);
   color: var(--color-foreground);
@@ -77,6 +111,7 @@ body {
 }
 
 .nav-link-inactive {
+  color: var(--color-foreground);
   transition:
     color 200ms ease,
     text-shadow 200ms ease;
@@ -84,39 +119,49 @@ body {
 
 .nav-link-active {
   font-weight: 600;
-}
-
-html.light .nav-link-active,
-html:not(.dark) .nav-link-active {
   color: var(--color-primary);
 }
 
-html.light .nav-link-inactive,
-html:not(.dark) .nav-link-inactive {
-  color: var(--color-foreground);
-}
-
-html.light .nav-link-inactive:hover,
-html:not(.dark) .nav-link-inactive:hover {
+.nav-link-inactive:hover {
   color: var(--color-primary);
   text-shadow:
     0 0 10px rgb(99 102 241 / 0.55),
     0 0 20px rgb(99 102 241 / 0.35);
 }
 
-html.dark .nav-link-inactive {
+html.dark:not([data-theme='light']) .nav-link-inactive,
+html[data-theme='dark'] .nav-link-inactive {
   color: #ffffff;
 }
 
-html.dark .nav-link-inactive:hover {
+html.dark:not([data-theme='light']) .nav-link-inactive:hover,
+html[data-theme='dark'] .nav-link-inactive:hover {
   color: var(--nav-dark-accent);
   text-shadow:
     0 0 10px rgb(var(--nav-dark-accent-rgb) / 0.6),
     0 0 20px rgb(var(--nav-dark-accent-rgb) / 0.4);
 }
 
-html.dark .nav-link-active {
+html.dark:not([data-theme='light']) .nav-link-active,
+html[data-theme='dark'] .nav-link-active {
   color: var(--nav-dark-accent);
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]):not(.dark) .nav-link-inactive {
+    color: #ffffff;
+  }
+
+  html:not([data-theme]):not(.dark) .nav-link-inactive:hover {
+    color: var(--nav-dark-accent);
+    text-shadow:
+      0 0 10px rgb(var(--nav-dark-accent-rgb) / 0.6),
+      0 0 20px rgb(var(--nav-dark-accent-rgb) / 0.4);
+  }
+
+  html:not([data-theme]):not(.dark) .nav-link-active {
+    color: var(--nav-dark-accent);
+  }
 }
 
 @keyframes dashboard-toast-in {
@@ -202,24 +247,52 @@ textarea {
     background-color 180ms ease;
 }
 
-html.light .date-input-light-icon,
-html:not(.dark) .date-input-light-icon {
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='hidden']),
+  select,
+  textarea {
+    min-height: 44px;
+  }
+
+  button,
+  [role='button'],
+  a,
+  input[type='button'],
+  input[type='submit'],
+  input[type='reset'] {
+    min-height: 44px;
+  }
+}
+
+.date-input-light-icon {
   color-scheme: light;
 }
 
-html.dark .date-input-light-icon {
+html.dark:not([data-theme='light']) .date-input-light-icon,
+html[data-theme='dark'] .date-input-light-icon {
   color-scheme: dark;
 }
 
-html.light .date-input-light-icon::-webkit-calendar-picker-indicator,
-html:not(.dark) .date-input-light-icon::-webkit-calendar-picker-indicator {
-  filter: invert(1);
+.date-input-light-icon::-webkit-calendar-picker-indicator {
+  filter: none;
   opacity: 0.95;
 }
 
-html.dark .date-input-light-icon::-webkit-calendar-picker-indicator {
+html.dark:not([data-theme='light']) .date-input-light-icon::-webkit-calendar-picker-indicator,
+html[data-theme='dark'] .date-input-light-icon::-webkit-calendar-picker-indicator {
   filter: none;
   opacity: 0.95;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]):not(.dark) .date-input-light-icon {
+    color-scheme: dark;
+  }
+
+  html:not([data-theme]):not(.dark) .date-input-light-icon::-webkit-calendar-picker-indicator {
+    filter: none;
+    opacity: 0.95;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

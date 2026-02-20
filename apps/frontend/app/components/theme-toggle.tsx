@@ -3,43 +3,91 @@
 import { useEffect, useState } from 'react';
 
 type Theme = 'light' | 'dark';
+const THEME_STORAGE_KEY = 'theme';
+const SYSTEM_DARK_QUERY = '(prefers-color-scheme: dark)';
+const THEME_CHANGED_EVENT = 'anvara-theme-changed';
+
+function getStoredTheme(): Theme | null {
+  try {
+    const stored = localStorage.getItem(THEME_STORAGE_KEY);
+    if (stored === 'light' || stored === 'dark') {
+      return stored;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function applyExplicitTheme(theme: Theme | null) {
+  const root = document.documentElement;
+  const systemTheme = window.matchMedia(SYSTEM_DARK_QUERY).matches ? 'dark' : 'light';
+  const effectiveTheme = theme ?? systemTheme;
+
+  if (theme === null) {
+    root.removeAttribute('data-theme');
+  } else {
+    root.dataset.theme = theme;
+  }
+
+  root.classList.toggle('dark', effectiveTheme === 'dark');
+}
 
 export function ThemeToggle() {
   // Start with undefined to prevent hydration mismatch
   const [theme, setTheme] = useState<Theme | undefined>(undefined);
 
-  // Initialize theme on mount (client-side only)
+  // Initialize effective theme from explicit user choice or system preference.
   useEffect(() => {
-    const stored = localStorage.getItem('theme') as Theme | null;
-    
-    if (stored) {
-      setTheme(stored);
-    } else {
-      // Default to light mode, let user choose
-      const systemPreference = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      setTheme(systemPreference);
-    }
-  }, []);
+    const mediaQuery = window.matchMedia(SYSTEM_DARK_QUERY);
+    const syncThemeFromSource = () => {
+      const stored = getStoredTheme();
 
-  // Apply theme to DOM when theme changes
-  useEffect(() => {
-    if (!theme) return;
-    
-    const root = document.documentElement;
-    if (theme === 'dark') {
-      root.classList.add('dark');
-      root.classList.remove('light');
-    } else {
-      root.classList.add('light');
-      root.classList.remove('dark');
-    }
-  }, [theme]);
+      if (stored) {
+        applyExplicitTheme(stored);
+        setTheme(stored);
+        return;
+      }
+
+      const systemTheme: Theme = mediaQuery.matches ? 'dark' : 'light';
+      applyExplicitTheme(null);
+      setTheme(systemTheme);
+    };
+
+    const updateFromSystem = () => {
+      if (getStoredTheme()) {
+        return;
+      }
+      syncThemeFromSource();
+    };
+
+    const handleThemeChanged = () => {
+      syncThemeFromSource();
+    };
+
+    syncThemeFromSource();
+    mediaQuery.addEventListener('change', updateFromSystem);
+    window.addEventListener('storage', handleThemeChanged);
+    window.addEventListener(THEME_CHANGED_EVENT, handleThemeChanged);
+
+    return () => {
+      mediaQuery.removeEventListener('change', updateFromSystem);
+      window.removeEventListener('storage', handleThemeChanged);
+      window.removeEventListener(THEME_CHANGED_EVENT, handleThemeChanged);
+    };
+  }, []);
 
   const toggleTheme = () => {
     if (!theme) return;
     const newTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(newTheme);
-    localStorage.setItem('theme', newTheme);
+    applyExplicitTheme(newTheme);
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, newTheme);
+    } catch {
+      // Ignore storage write errors.
+    }
+    window.dispatchEvent(new Event(THEME_CHANGED_EVENT));
   };
 
   // Show loading state during hydration
