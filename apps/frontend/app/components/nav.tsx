@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { authClient } from '@/auth-client';
+import { useBodyScrollLock } from '@/hooks/use-body-scroll-lock';
 import GlassSurface from './GlassSurface';
 import StaggeredMenu from './StaggeredMenu';
 import { ThemeToggle } from './theme-toggle';
@@ -17,6 +18,9 @@ export function Nav() {
   const user = session?.user;
   const [role, setRole] = useState<UserRole>(null);
   const [mounted, setMounted] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  useBodyScrollLock(isMobileMenuOpen);
 
   useEffect(() => {
     setMounted(true);
@@ -57,6 +61,7 @@ export function Nav() {
           },
         ]
       : []),
+    ...(user ? [{ label: 'Logout', ariaLabel: 'Log out of your account', link: '/logout' }] : []),
     ...(!user ? [{ label: 'Login', ariaLabel: 'Go to login page', link: '/login' }] : []),
   ];
 
@@ -80,7 +85,7 @@ export function Nav() {
 
   return (
     <>
-      <header className="sticky top-0 z-[70] px-4 pt-4 pointer-events-none lg:pointer-events-auto">
+      <header className="sticky top-0 z-[70] hidden px-4 pt-4 lg:block">
         <GlassSurface
           width="100%"
           height={72}
@@ -123,7 +128,7 @@ export function Nav() {
                 <span className="text-[var(--color-muted)]">...</span>
               ) : user ? (
                 <div className="flex items-center gap-4">
-                  <span className="text-sm text-[var(--color-foreground)] dark:text-white">
+                  <span className="text-sm text-[var(--color-foreground)]">
                     {user.name} {role && `(${role})`}
                   </span>
                   <button
@@ -149,8 +154,20 @@ export function Nav() {
       </header>
 
       <div className="lg:hidden">
-        <div className="fixed top-4 left-4 z-[80]">
-          <ThemeToggle />
+        <div
+          aria-hidden="true"
+          className="h-[calc(max(1rem,env(safe-area-inset-top))+72px+0.75rem)]"
+        />
+        <div className="pointer-events-none fixed inset-x-4 top-[max(1rem,env(safe-area-inset-top))] z-[79]">
+          <GlassSurface
+            width="100%"
+            height={72}
+            borderRadius={999}
+            backgroundOpacity={0.14}
+            saturation={1.35}
+            brightness={55}
+            className="mx-auto max-w-6xl border border-white/15"
+          />
         </div>
         <StaggeredMenu
           className="mobile-fixed-staggered"
@@ -159,15 +176,16 @@ export function Nav() {
           socialItems={[]}
           displaySocials={false}
           displayItemNumbering={true}
-          menuButtonColor="var(--color-muted)"
+          menuButtonColor="var(--color-foreground)"
           openMenuButtonColor="#ffffff"
           changeMenuColorOnOpen={true}
           colors={['#B19EEF', '#5227FF']}
           logoUrl="/anvara-logo.avif"
           accentColor="#5227FF"
-          onMenuOpen={() => console.log('Menu opened')}
-          onMenuClose={() => console.log('Menu closed')}
+          onMenuOpen={() => setIsMobileMenuOpen(true)}
+          onMenuClose={() => setIsMobileMenuOpen(false)}
           isFixed
+          rightSlot={<ThemeToggle />}
         />
       </div>
     </>

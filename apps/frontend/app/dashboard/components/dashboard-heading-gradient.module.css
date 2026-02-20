@@ -2,12 +2,14 @@
   display: inline-block;
 }
 
-:global(html.dark) .landingCtaHeadingGradient {
+:global(html.dark:not([data-theme='light'])) .landingCtaHeadingGradient,
+:global(html[data-theme='dark']) .landingCtaHeadingGradient {
   color: #b19eef;
 }
 
 @supports ((-webkit-background-clip: text) or (background-clip: text)) {
-  :global(html.dark) .landingCtaHeadingGradient {
+  :global(html.dark:not([data-theme='light'])) .landingCtaHeadingGradient,
+  :global(html[data-theme='dark']) .landingCtaHeadingGradient {
     background-image: linear-gradient(to right, #5227ff, #ff9ffc, #b19eef, #5227ff);
     background-size: 300% 100%;
     background-position: 50% 50%;
@@ -16,5 +18,24 @@
     -webkit-background-clip: text;
     color: transparent;
     -webkit-text-fill-color: transparent;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :global(html:not([data-theme]):not(.dark)) .landingCtaHeadingGradient {
+    color: #b19eef;
+  }
+
+  @supports ((-webkit-background-clip: text) or (background-clip: text)) {
+    :global(html:not([data-theme]):not(.dark)) .landingCtaHeadingGradient {
+      background-image: linear-gradient(to right, #5227ff, #ff9ffc, #b19eef, #5227ff);
+      background-size: 300% 100%;
+      background-position: 50% 50%;
+      background-repeat: repeat;
+      background-clip: text;
+      -webkit-background-clip: text;
+      color: transparent;
+      -webkit-text-fill-color: transparent;
+    }
   }
 }

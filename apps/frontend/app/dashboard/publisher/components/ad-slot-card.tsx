@@ -116,7 +116,7 @@ export function AdSlotCard({ adSlot, onToast }: AdSlotCardProps) {
   const basePriceErrorId = `${editPriceId}-error`;
 
   return (
-    <article className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+    <article className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:scale-[0.99] motion-reduce:active:scale-100">
       <div className="mb-3 flex items-start justify-between gap-2">
         <h3 className="text-base font-semibold text-[var(--color-foreground)]">{adSlot.name}</h3>
         <span
@@ -130,7 +130,7 @@ export function AdSlotCard({ adSlot, onToast }: AdSlotCardProps) {
         <p className="mb-4 line-clamp-2 text-sm text-[var(--color-muted)]">{adSlot.description}</p>
       )}
 
-      <div className="flex items-center justify-between rounded-lg bg-slate-50 p-3 text-sm">
+      <div className="flex items-center justify-between rounded-lg bg-[var(--color-surface-muted)] p-3 text-sm">
         <span
           className={`${adSlot.isAvailable ? 'text-emerald-700' : 'text-[var(--color-muted)]'}`}
         >

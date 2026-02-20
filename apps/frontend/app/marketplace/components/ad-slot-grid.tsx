@@ -225,7 +225,7 @@ export function AdSlotGrid() {
                   onClick={() =>
                     analytics.listingCardClick(slot.id, slot.name, slot.type, Number(slot.basePrice))
                   }
-                  className={`group relative block overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg ${!slot.isAvailable ? 'opacity-60' : ''}`}
+                  className={`group relative block overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.98] motion-reduce:active:scale-100 ${!slot.isAvailable ? 'opacity-60' : ''}`}
                 >
                   <div className={`h-1 w-full ${stripeColor}`} />
 
