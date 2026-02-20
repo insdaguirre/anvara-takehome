@@ -74,7 +74,9 @@ export function AdSlotDetail({ id }: Props) {
   const [adSlot, setAdSlot] = useState<AdSlotDetailRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<DetailErrorState | null>(null);
-  const [isOffline, setIsOffline] = useState(false);
+  const [isOffline, setIsOffline] = useState(
+    typeof navigator !== 'undefined' ? !navigator.onLine : false
+  );
   const [user, setUser] = useState<User | null>(null);
   const [roleInfo, setRoleInfo] = useState<RoleInfo | null>(null);
   const [roleLoading, setRoleLoading] = useState(true);
@@ -133,7 +135,7 @@ export function AdSlotDetail({ id }: Props) {
 
     const onOnline = () => {
       setIsOffline(false);
-      if (!adSlot) {
+      if (error?.type === 'network' || !adSlot) {
         loadAdSlot();
       }
     };
@@ -154,7 +156,7 @@ export function AdSlotDetail({ id }: Props) {
       window.removeEventListener('online', onOnline);
       window.removeEventListener('offline', onOffline);
     };
-  }, [adSlot, loadAdSlot]);
+  }, [adSlot, error?.type, loadAdSlot]);
 
   useEffect(() => {
     if (!error) return;
@@ -415,6 +417,7 @@ export function AdSlotDetail({ id }: Props) {
 
   if (error || !adSlot) {
     const isNotFound = error?.type === 'not_found' || (!error && !adSlot);
+    const isNetworkError = error?.type === 'network' || isOffline;
 
     return (
       <ErrorState
@@ -422,7 +425,7 @@ export function AdSlotDetail({ id }: Props) {
         message={
           isNotFound
             ? 'This ad slot may have been removed or is no longer available.'
-            : isOffline
+            : isNetworkError
               ? 'Check your internet connection and try again.'
               : (error?.message ?? 'Unable to load this listing right now.')
         }
@@ -431,7 +434,7 @@ export function AdSlotDetail({ id }: Props) {
         backButtonHref="/marketplace"
         backButtonLabel="Back to Marketplace"
         onBackButtonClick={handleBackToMarketplace}
-        variant={isNotFound ? 'warning' : isOffline ? 'network' : 'error'}
+        variant={isNotFound ? 'warning' : isNetworkError ? 'network' : 'error'}
       />
     );
   }

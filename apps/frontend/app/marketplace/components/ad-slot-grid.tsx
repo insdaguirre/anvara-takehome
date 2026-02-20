@@ -280,6 +280,7 @@ export function AdSlotGrid() {
         />
       ) : (
         <motion.div
+          key={`${filters.type}-${filters.category}-${filters.availableOnly}-${filters.search}-${filters.sortBy}`}
           className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
           variants={shouldReduceMotion ? undefined : gridEntranceVariants}
           initial={shouldReduceMotion ? false : 'hidden'}
