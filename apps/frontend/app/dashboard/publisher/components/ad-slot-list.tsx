@@ -1,8 +1,12 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertCircle, Inbox } from 'lucide-react';
+import { Inbox } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { EmptyState } from '@/app/components/EmptyState';
+import { ErrorState } from '@/app/components/ErrorState';
+import { analytics } from '@/lib/analytics';
 import type { AdSlot } from '@/lib/types';
 import type { DashboardToastInput } from '../../components/use-dashboard-toasts';
 import { AdSlotCard } from './ad-slot-card';
@@ -20,50 +24,48 @@ interface AdSlotListProps {
 export function AdSlotList({ adSlots, error, onToast }: AdSlotListProps) {
   const router = useRouter();
   const shouldReduceMotion = useReducedMotion();
+  const handleScrollToCreateButton = () => {
+    const createButton = document.querySelector<HTMLButtonElement>(
+      '[aria-controls="create-ad-slot-form"]'
+    );
+    if (!createButton) return;
+    createButton.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    createButton.focus();
+  };
+
+  useEffect(() => {
+    if (!error) return;
+    analytics.dashboardError('publisher', 'adSlots', error);
+  }, [error]);
 
   // Server-provided error state
   if (error) {
     return (
-      <div
-        className="rounded-xl border border-red-200 bg-red-50 p-5 text-red-700"
-        role="alert"
-        aria-live="assertive"
-      >
-        <div className="flex items-start gap-3">
-          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
-          <div>
-            <p className="font-semibold">Unable to load ad slots</p>
-            <p className="mt-1 text-sm">{error}</p>
-            <button
-              type="button"
-              onClick={() => {
-                onToast({
-                  tone: 'error',
-                  title: 'Refresh requested',
-                  message: 'Trying to load your ad slots again.',
-                });
-                router.refresh();
-              }}
-              className="mt-3 rounded-lg border border-red-300 px-3 py-1.5 text-sm font-medium transition-colors hover:bg-red-100"
-            >
-              Retry
-            </button>
-          </div>
-        </div>
-      </div>
+      <ErrorState
+        title="Unable to load ad slots"
+        message={error}
+        onRetry={() => {
+          onToast({
+            tone: 'error',
+            title: 'Refresh requested',
+            message: 'Trying to load your ad slots again.',
+          });
+          router.refresh();
+        }}
+        variant="error"
+      />
     );
   }
 
   // No loading state — data resolved server-side
   if (adSlots.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-background)] p-10 text-center">
-        <Inbox className="mx-auto h-9 w-9 text-[var(--color-muted)]" aria-hidden="true" />
-        <p className="mt-3 text-lg font-medium text-[var(--color-foreground)]">No ad slots yet</p>
-        <p className="mt-1 text-sm text-[var(--color-muted)]">
-          Create your first slot to start accepting sponsor bookings.
-        </p>
-      </div>
+      <EmptyState
+        icon={Inbox}
+        title="No ad slots yet"
+        description="Create your first slot to start accepting sponsor bookings."
+        action={{ label: 'Create Ad Slot', onClick: handleScrollToCreateButton }}
+      />
     );
   }
   // Presentation only rendering

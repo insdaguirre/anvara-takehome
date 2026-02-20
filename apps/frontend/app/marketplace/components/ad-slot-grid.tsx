@@ -2,8 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { Filter, Store } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
-import { getMarketplaceAdSlots } from '@/lib/api';
+import { EmptyState } from '@/app/components/EmptyState';
+import { ErrorState } from '@/app/components/ErrorState';
+import { SkeletonCard } from '@/app/components/SkeletonCard';
+import { getMarketplaceAdSlots, isApiError } from '@/lib/api';
 import { analytics } from '@/lib/analytics';
 import { formatCompactNumber, formatPrice } from '@/lib/format';
 import {
@@ -72,47 +76,79 @@ interface MarketplaceAdSlot {
   };
 }
 
-function renderSkeletonCards() {
-  return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {Array.from({ length: 6 }).map((_, index) => (
-        <div
-          key={index}
-          className="rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-4"
-        >
-          <div className="mb-3 h-1 w-full animate-pulse rounded bg-gray-200" />
-          <div className="mb-3 h-5 w-3/4 animate-pulse rounded bg-gray-200" />
-          <div className="mb-2 h-4 w-1/2 animate-pulse rounded bg-gray-200" />
-          <div className="mb-2 h-4 w-full animate-pulse rounded bg-gray-200" />
-          <div className="mb-4 h-4 w-2/3 animate-pulse rounded bg-gray-200" />
-          <div className="mb-3 h-4 w-full animate-pulse rounded bg-gray-200" />
-          <div className="h-5 w-1/3 animate-pulse rounded bg-gray-200" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export function AdSlotGrid() {
   const [adSlots, setAdSlots] = useState<MarketplaceAdSlot[]>([]);
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isOffline, setIsOffline] = useState(
+    typeof navigator !== 'undefined' ? !navigator.onLine : false
+  );
   const hasTrackedView = useRef(false);
+  const lastEmptyStateKeyRef = useRef<string | null>(null);
   const shouldReduceMotion = useReducedMotion();
 
   const loadAdSlots = useCallback(() => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setLoading(false);
+      setError('You appear to be offline. Reconnect and try again.');
+      setIsOffline(true);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
     getMarketplaceAdSlots()
       .then((slots) => setAdSlots(slots as MarketplaceAdSlot[]))
-      .catch(() => setError('Failed to load ad slots'))
+      .catch((loadError) => {
+        if (isApiError(loadError)) {
+          if (loadError.type === 'network') {
+            setIsOffline(true);
+          }
+          setError(loadError.message);
+          return;
+        }
+
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : 'Unable to load marketplace listings. Please try again.'
+        );
+      })
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
-    loadAdSlots();
+    const loadTimeout = window.setTimeout(() => {
+      loadAdSlots();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(loadTimeout);
+    };
+  }, [loadAdSlots]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const onOnline = () => {
+      setIsOffline(false);
+      loadAdSlots();
+    };
+
+    const onOffline = () => {
+      setIsOffline(true);
+      setError('You appear to be offline. Reconnect and try again.');
+    };
+
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
   }, [loadAdSlots]);
 
   useEffect(() => {
@@ -154,23 +190,66 @@ export function AdSlotGrid() {
     return slots;
   }, [adSlots, filters]);
 
+  useEffect(() => {
+    if (!error) return;
+    analytics.marketplaceError(error);
+  }, [error]);
+
+  useEffect(() => {
+    if (loading || error) return;
+
+    if (adSlots.length === 0) {
+      if (lastEmptyStateKeyRef.current !== 'no_listings') {
+        analytics.marketplaceEmpty('no_listings');
+        lastEmptyStateKeyRef.current = 'no_listings';
+      }
+      return;
+    }
+
+    if (filteredSlots.length === 0) {
+      const activeFilterCount = [
+        filters.type !== 'ALL',
+        filters.category !== 'ALL',
+        filters.availableOnly,
+        filters.search.trim().length > 0,
+        filters.sortBy !== defaultFilters.sortBy,
+      ].filter(Boolean).length;
+      const key = `filtered:${activeFilterCount}`;
+      if (lastEmptyStateKeyRef.current !== key) {
+        analytics.marketplaceEmpty('filtered', { filter_count: activeFilterCount });
+        lastEmptyStateKeyRef.current = key;
+      }
+      return;
+    }
+
+    lastEmptyStateKeyRef.current = null;
+  }, [adSlots.length, error, filteredSlots.length, filters, loading]);
+
   if (loading) {
     return (
       <div className="space-y-4">
         <MarketplaceFilters filters={filters} onChange={setFilters} resultCount={0} totalCount={0} />
-        {renderSkeletonCards()}
+        <SkeletonCard
+          variant="marketplace"
+          count={6}
+          gridClassName="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+        />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-600">
-        <p>{error}</p>
-        <button type="button" onClick={loadAdSlots} className="mt-2 text-sm underline">
-          Retry
-        </button>
-      </div>
+      <ErrorState
+        variant="network"
+        title="Unable to load marketplace listings"
+        message={
+          isOffline
+            ? 'Check your internet connection and try again.'
+            : error
+        }
+        onRetry={loadAdSlots}
+      />
     );
   }
 
@@ -184,28 +263,24 @@ export function AdSlotGrid() {
       />
 
       {adSlots.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-[var(--color-border)] p-12 text-center">
-          <p className="text-lg font-medium">The marketplace is being stocked with fresh listings.</p>
-          <p className="mt-2 text-sm text-[var(--color-muted)]">
-            Check back soon, or contact us to list your ad inventory.
-          </p>
-        </div>
+        <EmptyState
+          icon={Store}
+          title="The marketplace is launching soon"
+          description="We're stocking fresh listings. Check back soon, or contact us to list your ad inventory."
+          action={{ label: 'Contact Us', href: '/contact' }}
+          secondaryAction={{ label: 'List Your Inventory', href: '/dashboard/publisher' }}
+        />
       ) : filteredSlots.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-[var(--color-border)] p-12 text-center">
-          <p className="text-lg font-medium">No listings match your filters.</p>
-          <p className="mt-2 text-sm text-[var(--color-muted)]">
-            Try broadening your search or clearing active filters.
-          </p>
-          <button
-            type="button"
-            onClick={() => setFilters(defaultFilters)}
-            className="mt-4 text-sm font-medium text-[var(--color-primary)] hover:underline"
-          >
-            Clear all filters
-          </button>
-        </div>
+        <EmptyState
+          variant="filter"
+          icon={Filter}
+          title="No listings match your filters"
+          description="Try broadening your search or clearing active filters."
+          action={{ label: 'Clear Filters', onClick: () => setFilters(defaultFilters) }}
+        />
       ) : (
         <motion.div
+          key={`${filters.type}-${filters.category}-${filters.availableOnly}-${filters.search}-${filters.sortBy}`}
           className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
           variants={shouldReduceMotion ? undefined : gridEntranceVariants}
           initial={shouldReduceMotion ? false : 'hidden'}

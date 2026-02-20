@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState, type MouseEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
 import Link from 'next/link';
-import { getMarketplaceAdSlot } from '@/lib/api';
+import { ErrorState } from '@/app/components/ErrorState';
+import { getMarketplaceAdSlot, isApiError } from '@/lib/api';
 import { authClient } from '@/auth-client';
 import { useABTest } from '@/hooks/use-ab-test';
 import { analytics } from '@/lib/analytics';
@@ -10,9 +11,9 @@ import { formatCompactNumber, formatPrice } from '@/lib/format';
 import { BookingModal } from './booking-modal';
 import { QuoteModal } from './quote-modal';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4291';
+const API_URL = globalThis.process?.env.NEXT_PUBLIC_API_URL || 'http://localhost:4291';
 
-interface AdSlotDetail {
+interface AdSlotDetailRecord {
   id: string;
   name: string;
   description?: string | null;
@@ -63,11 +64,19 @@ interface Props {
   id: string;
 }
 
+interface DetailErrorState {
+  message: string;
+  type: 'network' | 'not_found' | 'error';
+}
+
 export function AdSlotDetail({ id }: Props) {
   const { variant: ctaButtonTextVariant, trackOutcome } = useABTest('cta-button-text');
-  const [adSlot, setAdSlot] = useState<AdSlotDetail | null>(null);
+  const [adSlot, setAdSlot] = useState<AdSlotDetailRecord | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<DetailErrorState | null>(null);
+  const [isOffline, setIsOffline] = useState(
+    typeof navigator !== 'undefined' ? !navigator.onLine : false
+  );
   const [user, setUser] = useState<User | null>(null);
   const [roleInfo, setRoleInfo] = useState<RoleInfo | null>(null);
   const [roleLoading, setRoleLoading] = useState(true);
@@ -87,12 +96,74 @@ export function AdSlotDetail({ id }: Props) {
     quote: false,
   });
 
-  useEffect(() => {
-    getMarketplaceAdSlot(id)
-      .then((slot) => setAdSlot(slot as AdSlotDetail))
-      .catch(() => setError('Failed to load ad slot details'))
-      .finally(() => setLoading(false));
+  const loadAdSlot = useCallback(() => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setLoading(false);
+      setError({
+        type: 'network',
+        message: 'You appear to be offline. Reconnect and try again.',
+      });
+      setIsOffline(true);
+      return;
+    }
 
+    setLoading(true);
+    setError(null);
+    setAdSlot(null);
+
+    getMarketplaceAdSlot(id)
+      .then((slot) => setAdSlot(slot as AdSlotDetailRecord))
+      .catch((loadError) => {
+        if (isApiError(loadError)) {
+          const type = loadError.type === 'not_found' ? 'not_found' : loadError.type === 'network' ? 'network' : 'error';
+          setError({ message: loadError.message, type });
+          return;
+        }
+
+        const message = loadError instanceof Error ? loadError.message : 'Failed to load ad slot details';
+        setError({ message, type: 'error' });
+      })
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  useEffect(() => {
+    loadAdSlot();
+  }, [loadAdSlot]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const onOnline = () => {
+      setIsOffline(false);
+      if (error?.type === 'network' || !adSlot) {
+        loadAdSlot();
+      }
+    };
+
+    const onOffline = () => {
+      setIsOffline(true);
+      setError({
+        type: 'network',
+        message: 'You appear to be offline. Reconnect and try again.',
+      });
+    };
+
+    setIsOffline(!window.navigator.onLine);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, [adSlot, error?.type, loadAdSlot]);
+
+  useEffect(() => {
+    if (!error) return;
+    analytics.listingError(id, error.message);
+  }, [error, id]);
+
+  useEffect(() => {
     authClient
       .getSession()
       .then(({ data }) => {
@@ -345,19 +416,26 @@ export function AdSlotDetail({ id }: Props) {
   }
 
   if (error || !adSlot) {
+    const isNotFound = error?.type === 'not_found' || (!error && !adSlot);
+    const isNetworkError = error?.type === 'network' || isOffline;
+
     return (
-      <div className="space-y-4">
-        <Link
-          href="/marketplace"
-          onClick={handleBackToMarketplace}
-          className="text-[var(--color-primary)] hover:underline"
-        >
-          ← Back to Marketplace
-        </Link>
-        <div className="rounded border border-red-200 bg-red-50 p-4 text-red-600">
-          {error || 'Ad slot not found'}
-        </div>
-      </div>
+      <ErrorState
+        title={isNotFound ? 'Listing not found' : 'Slot details unavailable'}
+        message={
+          isNotFound
+            ? 'This ad slot may have been removed or is no longer available.'
+            : isNetworkError
+              ? 'Check your internet connection and try again.'
+              : (error?.message ?? 'Unable to load this listing right now.')
+        }
+        onRetry={loadAdSlot}
+        showBackButton
+        backButtonHref="/marketplace"
+        backButtonLabel="Back to Marketplace"
+        onBackButtonClick={handleBackToMarketplace}
+        variant={isNotFound ? 'warning' : isNetworkError ? 'network' : 'error'}
+      />
     );
   }
 
@@ -449,7 +527,7 @@ export function AdSlotDetail({ id }: Props) {
                 </Link>
               </div>
 
-              {process.env.NODE_ENV === 'development' && (
+              {globalThis.process?.env.NODE_ENV === 'development' && (
                 <button
                   type="button"
                   onClick={handleUnbook}

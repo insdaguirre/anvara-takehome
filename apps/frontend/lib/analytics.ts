@@ -100,6 +100,30 @@ function buildDedupeKey(event: string, properties: EventProperties): string {
     return `${event}:${getDedupeKeyValue(properties.from_page)}:${getDedupeKeyValue(properties.to_page)}:${getDedupeKeyValue(properties.navigation_type)}`;
   }
 
+  if (event === 'dashboard_error') {
+    return `${event}:${getDedupeKeyValue(properties.role)}:${getDedupeKeyValue(properties.section)}:${getDedupeKeyValue(properties.error_type)}`;
+  }
+
+  if (event === 'marketplace_empty') {
+    return `${event}:${getDedupeKeyValue(properties.reason)}:${getDedupeKeyValue(properties.filter_count)}`;
+  }
+
+  if (event === 'marketplace_error') {
+    return `${event}:${getDedupeKeyValue(properties.error_message)}`;
+  }
+
+  if (event === 'listing_error') {
+    return `${event}:${getDedupeKeyValue(properties.slot_id)}:${getDedupeKeyValue(properties.error_message)}`;
+  }
+
+  if (event === 'global_error') {
+    return `${event}:${getDedupeKeyValue(properties.error_message)}:${getDedupeKeyValue(properties.digest)}`;
+  }
+
+  if (event === 'not_found') {
+    return `${event}:${getDedupeKeyValue(properties.pathname)}`;
+  }
+
   return `${event}:${getDedupeKeyValue(properties.slot_id)}:${getDedupeKeyValue(properties.cta_type)}`;
 }
 
@@ -128,7 +152,7 @@ function shouldDedupeEvent(eventKey: string): boolean {
 export function track(event: string, properties: EventProperties = {}): void {
   const dedupeKey = buildDedupeKey(event, properties);
   if (shouldDedupeEvent(dedupeKey)) {
-    if (process.env.NODE_ENV === 'development') {
+    if (globalThis.process?.env.NODE_ENV === 'development') {
       console.log(`[Analytics] [DEDUPE] ${event}`, properties);
     }
     return;
@@ -152,7 +176,7 @@ export function track(event: string, properties: EventProperties = {}): void {
     sessionId: getSessionId(),
   };
 
-  if (process.env.NODE_ENV === 'development') {
+  if (globalThis.process?.env.NODE_ENV === 'development') {
     console.log(`[Analytics] ${event}`, analyticsEvent.properties);
   }
 
@@ -185,6 +209,28 @@ export const analytics = {
     }),
 
   marketplaceView: (slotCount: number) => track('marketplace_view', { slot_count: slotCount }),
+
+  dashboardError: (
+    role: 'sponsor' | 'publisher',
+    section: 'campaigns' | 'ad_slots' | string,
+    errorType: string
+  ) => track('dashboard_error', { role, section, error_type: errorType }),
+
+  marketplaceError: (message: string) => track('marketplace_error', { error_message: message }),
+
+  marketplaceEmpty: (reason: string, metadata: EventProperties = {}) =>
+    track('marketplace_empty', { reason, ...metadata }),
+
+  listingError: (slotId: string, message: string) =>
+    track('listing_error', { slot_id: slotId, error_message: message }),
+
+  globalError: (message: string, digest?: string) =>
+    track('global_error', {
+      error_message: message,
+      ...(typeof digest === 'string' && digest.length > 0 && { digest }),
+    }),
+
+  notFound: (pathname: string) => track('not_found', { pathname }),
 
   listingCardImpression: (slotId: string, slotName: string, position: number) =>
     track('listing_card_impression', { slot_id: slotId, slot_name: slotName, position }),

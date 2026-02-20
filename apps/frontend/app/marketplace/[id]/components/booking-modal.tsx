@@ -1,11 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { InlineNotice } from '@/app/components/InlineNotice';
 import { useBodyScrollLock } from '@/hooks/use-body-scroll-lock';
 import { analytics } from '@/lib/analytics';
 import { formatPrice } from '@/lib/format';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4291';
+const API_URL = globalThis.process?.env.NEXT_PUBLIC_API_URL || 'http://localhost:4291';
 
 interface BookingModalAdSlot {
   id: string;
@@ -232,7 +233,7 @@ export function BookingModal({
             />
           </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error ? <InlineNotice tone="error">{error}</InlineNotice> : null}
 
           <button
             type="submit"

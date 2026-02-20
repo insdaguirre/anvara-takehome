@@ -4,9 +4,10 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { authClient } from '@/auth-client';
+import { InlineNotice } from '@/app/components/InlineNotice';
 import { LandingBackground } from '@/app/components/landing/landing-background';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4291';
+const API_URL = globalThis.process?.env.NEXT_PUBLIC_API_URL || 'http://localhost:4291';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -78,8 +79,8 @@ export default function LoginPage() {
           <h1 className="mb-6 text-2xl font-bold">Login to Anvara</h1>
 
           {error && (
-            <div className="mb-4 rounded border border-red-200 bg-red-50 p-3 text-red-600">
-              {error}
+            <div className="mb-4">
+              <InlineNotice tone="error">{error}</InlineNotice>
             </div>
           )}
 
