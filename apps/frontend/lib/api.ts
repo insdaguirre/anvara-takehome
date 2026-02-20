@@ -1,64 +1,129 @@
-// Simple API client
-// FIXME: This client has no error response parsing - when API returns { error: "..." },
-// we should extract and throw that message instead of generic "API request failed"
+const API_URL = globalThis.process?.env.NEXT_PUBLIC_API_URL || 'http://localhost:4291';
 
-// TODO: Add authentication token to requests
-// Hint: Include credentials: 'include' for cookie-based auth, or
-// add Authorization header for token-based auth
+export type ApiErrorType = 'network' | 'auth' | 'not_found' | 'server' | 'validation' | 'unknown';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4291';
+interface ApiErrorOptions {
+  type: ApiErrorType;
+  statusCode?: number;
+  fieldErrors?: Record<string, string>;
+}
 
-export async function api<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${endpoint}`, {
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    credentials: 'include',
-    ...options,
+interface ApiErrorPayload {
+  error?: unknown;
+  fieldErrors?: unknown;
+}
+
+export class ApiError extends Error {
+  type: ApiErrorType;
+  statusCode?: number;
+  fieldErrors?: Record<string, string>;
+
+  constructor(message: string, options: ApiErrorOptions) {
+    super(message);
+    this.name = 'ApiError';
+    this.type = options.type;
+    this.statusCode = options.statusCode;
+    this.fieldErrors = options.fieldErrors;
+  }
+}
+
+function parseFieldErrors(value: unknown): Record<string, string> | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+
+  const entries = Object.entries(value).filter((entry): entry is [string, string] => {
+    const [, message] = entry;
+    return typeof message === 'string' && message.length > 0;
   });
 
-  if (!res.ok) {
-    let payload: unknown;
+  if (entries.length === 0) return undefined;
+  return Object.fromEntries(entries);
+}
 
+function mapStatusToErrorType(status: number): ApiErrorType {
+  if (status === 400) return 'validation';
+  if (status === 401 || status === 403) return 'auth';
+  if (status === 404) return 'not_found';
+  if (status >= 500) return 'server';
+  return 'unknown';
+}
+
+function getFallbackMessage(type: ApiErrorType): string {
+  if (type === 'network') return 'Check your internet connection and try again.';
+  if (type === 'auth') return 'Please sign in and try again.';
+  if (type === 'not_found') return 'This resource could not be found.';
+  if (type === 'server') return 'Our servers are temporarily unavailable. Please try again in a moment.';
+  if (type === 'validation') return 'Please review your input and try again.';
+  return 'Something went wrong. Please try again.';
+}
+
+function toPayloadErrorMessage(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') return null;
+  if (!('error' in payload)) return null;
+  const message = payload.error;
+  if (typeof message !== 'string' || message.length === 0) return null;
+  return message;
+}
+
+export function isApiError(value: unknown): value is ApiError {
+  return value instanceof ApiError;
+}
+
+type ApiRequestOptions = Parameters<typeof fetch>[1];
+
+export async function api<T>(endpoint: string, options?: ApiRequestOptions): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${endpoint}`, {
+      headers: { 'Content-Type': 'application/json', ...options?.headers },
+      credentials: 'include',
+      ...options,
+    });
+  } catch {
+    throw new ApiError(getFallbackMessage('network'), { type: 'network' });
+  }
+
+  if (!res.ok) {
+    let payload: ApiErrorPayload | null = null;
     try {
-      payload = await res.json();
+      payload = (await res.json()) as ApiErrorPayload;
     } catch {
       payload = null;
     }
 
-    if (typeof payload === 'object' && payload !== null && 'error' in payload) {
-      const errorMessage = payload.error;
-      if (typeof errorMessage === 'string' && errorMessage.length > 0) {
-        throw new Error(errorMessage);
-      }
-    }
+    const type = mapStatusToErrorType(res.status);
+    const message = toPayloadErrorMessage(payload) ?? getFallbackMessage(type);
+    const fieldErrors = parseFieldErrors(payload?.fieldErrors);
 
-    throw new Error('API request failed');
+    throw new ApiError(message, {
+      type,
+      statusCode: res.status,
+      fieldErrors,
+    });
   }
 
   return res.json();
 }
 
 // Campaigns
-export const getCampaigns = () => api<any[]>('/api/campaigns');
-export const getCampaign = (id: string) => api<any>(`/api/campaigns/${id}`);
-export const createCampaign = (data: any) =>
+export const getCampaigns = () => api<unknown[]>('/api/campaigns');
+export const getCampaign = (id: string) => api<unknown>(`/api/campaigns/${id}`);
+export const createCampaign = (data: unknown) =>
   api('/api/campaigns', { method: 'POST', body: JSON.stringify(data) });
-// TODO: Add updateCampaign and deleteCampaign functions
 
 // Ad Slots
-export const getAdSlots = () => api<any[]>('/api/ad-slots');
-export const getAdSlot = (id: string) => api<any>(`/api/ad-slots/${id}`);
-export const createAdSlot = (data: any) =>
+export const getAdSlots = () => api<unknown[]>('/api/ad-slots');
+export const getAdSlot = (id: string) => api<unknown>(`/api/ad-slots/${id}`);
+export const createAdSlot = (data: unknown) =>
   api('/api/ad-slots', { method: 'POST', body: JSON.stringify(data) });
-// TODO: Add updateAdSlot, deleteAdSlot functions
 
 // Public marketplace routes
-export const getMarketplaceAdSlots = () => api<any[]>('/api/marketplace/ad-slots');
-export const getMarketplaceAdSlot = (id: string) => api<any>(`/api/marketplace/ad-slots/${id}`);
+export const getMarketplaceAdSlots = () => api<unknown[]>('/api/marketplace/ad-slots');
+export const getMarketplaceAdSlot = (id: string) => api<unknown>(`/api/marketplace/ad-slots/${id}`);
 
 // Placements
-export const getPlacements = () => api<any[]>('/api/placements');
-export const createPlacement = (data: any) =>
+export const getPlacements = () => api<unknown[]>('/api/placements');
+export const createPlacement = (data: unknown) =>
   api('/api/placements', { method: 'POST', body: JSON.stringify(data) });
 
 // Dashboard
-export const getStats = () => api<any>('/api/dashboard/stats');
+export const getStats = () => api<unknown>('/api/dashboard/stats');

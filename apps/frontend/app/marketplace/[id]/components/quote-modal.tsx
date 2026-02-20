@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { InlineNotice } from '@/app/components/InlineNotice';
 import { analytics } from '@/lib/analytics';
 import { formatPrice } from '@/lib/format';
 
@@ -500,11 +501,7 @@ export function QuoteModal({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4" aria-busy={submitting}>
-          {formError && (
-            <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              {formError}
-            </div>
-          )}
+          {formError ? <InlineNotice tone="error">{formError}</InlineNotice> : null}
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
