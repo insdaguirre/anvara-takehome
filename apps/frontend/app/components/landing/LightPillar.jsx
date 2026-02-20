@@ -32,6 +32,7 @@ const LightPillar = ({
     const canvas = document.createElement('canvas');
     const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
     if (!gl) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setWebGLSupported(false);
     }
   }, []);
@@ -79,7 +80,8 @@ const LightPillar = ({
         stencil: false,
         depth: false
       });
-    } catch (error) {
+    } catch {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setWebGLSupported(false);
       return;
     }

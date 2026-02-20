@@ -1,4 +1,4 @@
-import type { FC } from 'react';
+import type { FC, ReactNode } from 'react';
 
 interface StaggeredMenuItem {
   label: string;
@@ -28,6 +28,7 @@ interface StaggeredMenuProps {
   closeOnClickAway?: boolean;
   onMenuOpen?: () => void;
   onMenuClose?: () => void;
+  rightSlot?: ReactNode;
 }
 
 declare const StaggeredMenu: FC<StaggeredMenuProps>;

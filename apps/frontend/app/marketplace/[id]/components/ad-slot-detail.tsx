@@ -194,6 +194,7 @@ export function AdSlotDetail({ id }: Props) {
       Number(adSlot.basePrice),
       Boolean(adSlot.isAvailable)
     );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adSlot?.id]);
 
   useEffect(() => {
@@ -283,6 +284,7 @@ export function AdSlotDetail({ id }: Props) {
     }
 
     return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adSlot?.id]);
 
   useEffect(() => {
@@ -359,6 +361,7 @@ export function AdSlotDetail({ id }: Props) {
       setBookingSuccess(false);
       setAdSlot({ ...adSlot, isAvailable: true });
     } catch (resetError) {
+      // eslint-disable-next-line no-console
       console.error('Failed to reset booking:', resetError);
     } finally {
       setResetting(false);
