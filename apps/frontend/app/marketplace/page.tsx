@@ -1,12 +1,30 @@
 import { GrainientPageShell } from '@/app/components/grainient-page-shell';
-import { AdSlotGrid } from './components/ad-slot-grid';
+import { getMarketplaceAdSlots } from '@/lib/api';
+import { AdSlotGrid, type MarketplaceAdSlot } from './components/ad-slot-grid';
+import { parseMarketplaceQueryState } from './query-state';
 
-// FIXME: This page fetches all ad slots client-side. Consider:
-// 1. Server-side pagination with searchParams
-// 2. Filtering by category, price range, slot type
-// 3. Search functionality
+interface MarketplacePageProps {
+  searchParams?:
+    | Promise<Record<string, string | string[] | undefined>>
+    | Record<string, string | string[] | undefined>;
+}
 
-export default function MarketplacePage() {
+export default async function MarketplacePage({ searchParams }: MarketplacePageProps) {
+  const resolvedSearchParams = (await searchParams) ?? {};
+  const initialQueryState = parseMarketplaceQueryState(resolvedSearchParams);
+  const initialResponse = await getMarketplaceAdSlots<MarketplaceAdSlot>(
+    {
+      page: initialQueryState.page,
+      limit: initialQueryState.limit,
+      type: initialQueryState.type,
+      category: initialQueryState.category,
+      available: initialQueryState.availableOnly,
+      search: initialQueryState.search,
+      sortBy: initialQueryState.sortBy,
+    },
+    { cache: 'no-store' }
+  );
+
   return (
     <GrainientPageShell>
       <div className="space-y-6">
@@ -17,7 +35,7 @@ export default function MarketplacePage() {
           </p>
         </div>
 
-        <AdSlotGrid />
+        <AdSlotGrid initialResponse={initialResponse} initialQueryState={initialQueryState} />
       </div>
     </GrainientPageShell>
   );

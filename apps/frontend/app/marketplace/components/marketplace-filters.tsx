@@ -2,43 +2,16 @@
 
 import { useEffect, useRef } from 'react';
 import { analytics } from '@/lib/analytics';
+import { defaultMarketplaceFilters, type MarketplaceFilterState } from '../query-state';
 
-export type MarketplaceFilterType =
-  | 'ALL'
-  | 'DISPLAY'
-  | 'VIDEO'
-  | 'NATIVE'
-  | 'NEWSLETTER'
-  | 'PODCAST';
-export type MarketplaceFilterCategory =
-  | 'ALL'
-  | 'Technology'
-  | 'Podcast'
-  | 'Newsletter'
-  | 'Video'
-  | 'Business';
-export type MarketplaceSortBy = 'price-desc' | 'price-asc' | 'name' | 'audience';
-
-export interface FilterState {
-  type: MarketplaceFilterType;
-  category: MarketplaceFilterCategory;
-  availableOnly: boolean;
-  sortBy: MarketplaceSortBy;
-  search: string;
-}
+export type FilterState = MarketplaceFilterState;
 
 interface MarketplaceFiltersProps {
   filters: FilterState;
   onChange(next: FilterState): void;
 }
 
-export const defaultFilters: FilterState = {
-  type: 'ALL',
-  category: 'ALL',
-  availableOnly: true,
-  sortBy: 'price-desc',
-  search: '',
-};
+export const defaultFilters: FilterState = defaultMarketplaceFilters;
 
 function isDefaultFilters(filters: FilterState): boolean {
   return (

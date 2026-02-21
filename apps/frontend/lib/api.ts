@@ -140,7 +140,8 @@ export interface MarketplaceAdSlotParams {
 }
 
 export function getMarketplaceAdSlots<T = unknown>(
-  params: MarketplaceAdSlotParams = {}
+  params: MarketplaceAdSlotParams = {},
+  options?: ApiRequestOptions
 ): Promise<PaginatedMarketplaceResponse<T>> {
   const qs = new URLSearchParams();
   if (params.page !== undefined) qs.set('page', String(params.page));
@@ -152,7 +153,8 @@ export function getMarketplaceAdSlots<T = unknown>(
   if (params.sortBy) qs.set('sortBy', params.sortBy);
   const query = qs.toString();
   return api<PaginatedMarketplaceResponse<T>>(
-    `/api/marketplace/ad-slots${query ? `?${query}` : ''}`
+    `/api/marketplace/ad-slots${query ? `?${query}` : ''}`,
+    options
   );
 }
 

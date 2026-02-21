@@ -6,9 +6,6 @@ import { AnalyticsListener } from './components/analytics-listener';
 import { Nav } from './components/nav';
 import { Footer } from './components/footer';
 
-// TODO: Add ErrorBoundary wrapper for graceful error handling
-// TODO: Consider adding a loading.tsx for Suspense boundaries
-
 export const metadata: Metadata = {
   title: {
     default: 'Anvara Marketplace',
