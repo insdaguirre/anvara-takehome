@@ -61,9 +61,3 @@ export function clampValue(value: number, min: number, max: number): number {
   if (value > max) return max;
   return value;
 }
-
-// TODO: Add proper date formatting helper
-// BUG: Doesn't handle invalid dates
-export function formatDate(date: Date | string | number): string {
-  return new Date(date).toLocaleDateString();
-}

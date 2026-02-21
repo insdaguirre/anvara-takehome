@@ -26,8 +26,8 @@
     "better-auth": "^1.4.15",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
-    "express-rate-limit": "^8.2.1",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.2.1",
     "pg": "^8.17.1"
   },
   "devDependencies": {
@@ -36,8 +36,10 @@
     "@anvara/prettier-config": "workspace:*",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "@types/supertest": "^6.0.3",
     "eslint": "^9.39.2",
     "prisma": "^7.2.0",
+    "supertest": "^7.2.2",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.17"
