@@ -71,17 +71,3 @@ export const logger = {
     console.warn('[App Warning]', ...args);
   },
 };
-
-// TODO: Add a proper date formatting utility
-// BUG: Doesn't handle timezone or invalid dates
-export function formatRelativeTime(date: Date | string | number): string {
-  const now = new Date();
-  const then = new Date(date);
-  const diff = now.getTime() - then.getTime();
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-
-  if (days === 0) return 'Today';
-  if (days === 1) return 'Yesterday';
-  if (days < 7) return `${days} days ago`;
-  return then.toLocaleDateString();
-}
