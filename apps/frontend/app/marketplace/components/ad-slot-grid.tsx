@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ChevronLeft, ChevronRight, Filter, Store } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import { EmptyState } from '@/app/components/EmptyState';
@@ -11,17 +12,22 @@ import {
   getMarketplaceAdSlots,
   isApiError,
   type MarketplacePagination,
+  type PaginatedMarketplaceResponse,
 } from '@/lib/api';
 import { analytics } from '@/lib/analytics';
 import { formatCompactNumber, formatPrice } from '@/lib/format';
+import { MarketplaceFilters, defaultFilters, type FilterState } from './marketplace-filters';
 import {
-  MarketplaceFilters,
-  defaultFilters,
-  type FilterState,
-} from './marketplace-filters';
+  MARKETPLACE_PAGE_SIZE_OPTIONS,
+  isMarketplaceQueryStateEqual,
+  parseMarketplaceQueryState,
+  toMarketplaceQueryString,
+  type MarketplacePageSize,
+  type MarketplaceQueryState,
+} from '../query-state';
 
-const PAGE_SIZE_OPTIONS = [12, 24, 48] as const;
-type PageSize = (typeof PAGE_SIZE_OPTIONS)[number];
+const PAGE_SIZE_OPTIONS = MARKETPLACE_PAGE_SIZE_OPTIONS;
+type PageSize = MarketplacePageSize;
 
 const typeColors: Record<string, string> = {
   DISPLAY: 'bg-blue-100 text-blue-700',
@@ -56,7 +62,7 @@ const gridItemVariants = {
   },
 };
 
-interface MarketplaceAdSlot {
+export interface MarketplaceAdSlot {
   id: string;
   name: string;
   description?: string | null;
@@ -76,6 +82,11 @@ interface MarketplaceAdSlot {
     isVerified?: boolean | null;
   } | null;
   _count?: { placements?: number };
+}
+
+interface AdSlotGridProps {
+  initialResponse: PaginatedMarketplaceResponse<MarketplaceAdSlot>;
+  initialQueryState: MarketplaceQueryState;
 }
 
 // --- Pagination controls ---
@@ -123,7 +134,6 @@ function PaginationControls({
 
   return (
     <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-between">
-      {/* result summary + per-page selector */}
       <div className="flex items-center gap-3 text-sm text-[var(--color-muted)]">
         <span className="text-black">
           {total === 0
@@ -148,7 +158,6 @@ function PaginationControls({
         </label>
       </div>
 
-      {/* page buttons */}
       {totalPages > 1 && (
         <nav aria-label="Pagination" className="flex items-center gap-1">
           <button
@@ -199,22 +208,42 @@ function PaginationControls({
   );
 }
 
+function queryStateToFilterState(state: MarketplaceQueryState): FilterState {
+  return {
+    type: state.type,
+    category: state.category,
+    availableOnly: state.availableOnly,
+    sortBy: state.sortBy,
+    search: state.search,
+  };
+}
+
+function buildQueryState(page: number, pageSize: PageSize, filters: FilterState): MarketplaceQueryState {
+  return {
+    page,
+    limit: pageSize,
+    type: filters.type,
+    category: filters.category,
+    availableOnly: filters.availableOnly,
+    sortBy: filters.sortBy,
+    search: filters.search,
+  };
+}
+
 // --- Main grid ---
 
-export function AdSlotGrid() {
-  const [slots, setSlots] = useState<MarketplaceAdSlot[]>([]);
-  const [pagination, setPagination] = useState<MarketplacePagination>({
-    page: 1,
-    limit: 12,
-    total: 0,
-    totalPages: 0,
-  });
-  const [filters, setFilters] = useState<FilterState>(defaultFilters);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState<PageSize>(12);
+export function AdSlotGrid({ initialResponse, initialQueryState }: AdSlotGridProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
-  const [loading, setLoading] = useState(true);
-  // 'page' errors replace the grid; 'partial' errors show an inline notice above controls
+  const [slots, setSlots] = useState<MarketplaceAdSlot[]>(initialResponse.data);
+  const [pagination, setPagination] = useState<MarketplacePagination>(initialResponse.pagination);
+  const [filters, setFilters] = useState<FilterState>(queryStateToFilterState(initialQueryState));
+  const [page, setPage] = useState(initialQueryState.page);
+  const [pageSize, setPageSize] = useState<PageSize>(initialQueryState.limit);
+
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<{ message: string; isOffline: boolean } | null>(null);
   const [isOffline, setIsOffline] = useState(
     typeof navigator !== 'undefined' ? !navigator.onLine : false
@@ -222,8 +251,9 @@ export function AdSlotGrid() {
 
   const hasTrackedView = useRef(false);
   const shouldReduceMotion = useReducedMotion();
-  // track the latest request so stale responses are ignored
   const fetchIdRef = useRef(0);
+  const lastNavigationQueryRef = useRef<string | null>(null);
+  const localQueryStateRef = useRef<MarketplaceQueryState>(initialQueryState);
 
   const loadPage = useCallback(
     (targetPage: number, targetSize: PageSize, activeFilters: FilterState) => {
@@ -248,7 +278,7 @@ export function AdSlotGrid() {
         sortBy: activeFilters.sortBy,
       })
         .then((res) => {
-          if (fetchId !== fetchIdRef.current) return; // stale
+          if (fetchId !== fetchIdRef.current) return;
           setSlots(res.data);
           setPagination(res.pagination);
         })
@@ -273,13 +303,67 @@ export function AdSlotGrid() {
     []
   );
 
-  // initial load
-  useEffect(() => {
-    loadPage(page, pageSize, filters);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const syncUrl = useCallback(
+    (nextState: MarketplaceQueryState) => {
+      const nextQuery = toMarketplaceQueryString(nextState);
+      const currentQuery = searchParams.toString();
+      if (nextQuery === currentQuery) return;
 
-  // online/offline listeners
+      lastNavigationQueryRef.current = nextQuery;
+      const href = nextQuery.length > 0 ? `${pathname}?${nextQuery}` : pathname;
+      router.push(href, { scroll: false });
+    },
+    [pathname, router, searchParams]
+  );
+
+  const applyQueryState = useCallback(
+    (
+      nextState: MarketplaceQueryState,
+      options?: { syncUrl?: boolean; fetch?: boolean; scrollToTop?: boolean }
+    ) => {
+      const nextFilters = queryStateToFilterState(nextState);
+      setFilters(nextFilters);
+      setPage(nextState.page);
+      setPageSize(nextState.limit);
+
+      if (options?.syncUrl) {
+        syncUrl(nextState);
+      }
+
+      if (options?.fetch) {
+        loadPage(nextState.page, nextState.limit, nextFilters);
+      }
+
+      if (options?.scrollToTop && typeof window !== 'undefined') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    },
+    [loadPage, syncUrl]
+  );
+
+  useEffect(() => {
+    localQueryStateRef.current = buildQueryState(page, pageSize, filters);
+  }, [filters, page, pageSize]);
+
+  useEffect(() => {
+    const nextState = parseMarketplaceQueryState(searchParams);
+    const nextQuery = toMarketplaceQueryString(nextState);
+
+    if (lastNavigationQueryRef.current === nextQuery) {
+      lastNavigationQueryRef.current = null;
+      return;
+    }
+
+    const currentState = localQueryStateRef.current;
+    if (isMarketplaceQueryStateEqual(nextState, currentState)) {
+      return;
+    }
+
+    // URL back/forward navigation should drive local state and refetch data.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    applyQueryState(nextState, { fetch: true });
+  }, [applyQueryState, searchParams]);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -287,6 +371,7 @@ export function AdSlotGrid() {
       setIsOffline(false);
       loadPage(page, pageSize, filters);
     };
+
     const onOffline = () => {
       setIsOffline(true);
       setError({ message: 'You appear to be offline. Reconnect and try again.', isOffline: true });
@@ -294,15 +379,13 @@ export function AdSlotGrid() {
 
     window.addEventListener('online', onOnline);
     window.addEventListener('offline', onOffline);
+
     return () => {
       window.removeEventListener('online', onOnline);
       window.removeEventListener('offline', onOffline);
     };
-    // intentionally only re-register when loadPage identity changes (never)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadPage]);
+  }, [filters, loadPage, page, pageSize]);
 
-  // analytics: track first successful view
   useEffect(() => {
     if (!loading && !error && !hasTrackedView.current) {
       analytics.marketplaceView(pagination.total);
@@ -310,47 +393,47 @@ export function AdSlotGrid() {
     }
   }, [error, loading, pagination.total]);
 
-  // analytics: track errors
   useEffect(() => {
     if (error) analytics.marketplaceError(error.message);
   }, [error]);
 
   const handleFilterChange = useCallback(
     (next: FilterState) => {
-      setFilters(next);
-      setPage(1);
-      loadPage(1, pageSize, next);
+      applyQueryState(buildQueryState(1, pageSize, next), {
+        syncUrl: true,
+        fetch: true,
+      });
     },
-    [loadPage, pageSize]
+    [applyQueryState, pageSize]
   );
 
   const handlePageChange = useCallback(
     (next: number) => {
-      setPage(next);
-      loadPage(next, pageSize, filters);
-      // scroll to top of grid smoothly
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      const bounded = Math.max(1, next);
+      applyQueryState(buildQueryState(bounded, pageSize, filters), {
+        syncUrl: true,
+        fetch: true,
+        scrollToTop: true,
+      });
     },
-    [filters, loadPage, pageSize]
+    [applyQueryState, filters, pageSize]
   );
 
   const handlePageSizeChange = useCallback(
     (next: PageSize) => {
-      setPageSize(next);
-      setPage(1);
-      loadPage(1, next, filters);
+      applyQueryState(buildQueryState(1, next, filters), {
+        syncUrl: true,
+        fetch: true,
+      });
     },
-    [filters, loadPage]
+    [applyQueryState, filters]
   );
 
   const handleRetry = useCallback(() => {
     loadPage(page, pageSize, filters);
   }, [filters, loadPage, page, pageSize]);
 
-  // --- Render ---
-
   if (loading && slots.length === 0) {
-    // first load — show skeleton with filter bar
     return (
       <div className="space-y-4">
         <MarketplaceFilters filters={filters} onChange={handleFilterChange} />
@@ -364,14 +447,11 @@ export function AdSlotGrid() {
   }
 
   if (error && slots.length === 0) {
-    // hard error with no prior data — show full-page error state
     return (
       <ErrorState
         variant="network"
         title="Unable to load marketplace listings"
-        message={
-          isOffline ? 'Check your internet connection and try again.' : error.message
-        }
+        message={isOffline ? 'Check your internet connection and try again.' : error.message}
         onRetry={handleRetry}
       />
     );
@@ -381,7 +461,6 @@ export function AdSlotGrid() {
     <div className="space-y-4">
       <MarketplaceFilters filters={filters} onChange={handleFilterChange} />
 
-      {/* inline error banner when a subsequent page fetch fails but we have prior data */}
       {error && slots.length > 0 && (
         <div
           role="alert"
@@ -398,7 +477,6 @@ export function AdSlotGrid() {
         </div>
       )}
 
-      {/* grid area */}
       {loading ? (
         <SkeletonCard
           variant="marketplace"
@@ -406,7 +484,6 @@ export function AdSlotGrid() {
           gridClassName="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
         />
       ) : slots.length === 0 && pagination.total === 0 && !error ? (
-        // no listings at all in the DB
         <EmptyState
           icon={Store}
           title="The marketplace is launching soon"
@@ -415,7 +492,6 @@ export function AdSlotGrid() {
           secondaryAction={{ label: 'List Your Inventory', href: '/dashboard/publisher' }}
         />
       ) : slots.length === 0 && !error ? (
-        // filters narrowed everything to zero
         <EmptyState
           variant="filter"
           icon={Filter}
@@ -480,9 +556,7 @@ export function AdSlotGrid() {
                     )}
 
                     {slot.description && (
-                      <p className="line-clamp-2 text-sm text-[var(--color-muted)]">
-                        {slot.description}
-                      </p>
+                      <p className="line-clamp-2 text-sm text-[var(--color-muted)]">{slot.description}</p>
                     )}
 
                     <div className="border-y border-[var(--color-border)] py-2 text-xs text-[var(--color-muted)]">
@@ -496,9 +570,7 @@ export function AdSlotGrid() {
                     </div>
 
                     {placementCount > 0 && (
-                      <p className="text-xs text-[var(--color-muted)]">
-                        {placementCount} past bookings
-                      </p>
+                      <p className="text-xs text-[var(--color-muted)]">{placementCount} past bookings</p>
                     )}
 
                     <div className="flex items-end justify-between">
@@ -524,7 +596,6 @@ export function AdSlotGrid() {
         </motion.div>
       )}
 
-      {/* pagination controls — shown whenever we have data or totalPages > 0 */}
       {(pagination.total > 0 || pagination.totalPages > 0) && (
         <PaginationControls
           pagination={pagination}

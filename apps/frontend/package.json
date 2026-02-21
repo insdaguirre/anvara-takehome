@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "dotenv -o -e ../../.env -- next dev -p 3847",
-    "build": "next build",
-    "start": "next start -p 3847",
+    "build": "dotenv -o -e ../../.env -- next build",
+    "start": "dotenv -o -e ../../.env -- next start -p 3847",
     "lint": "eslint .",
     "format": "prettier --write .",
     "test": "vitest",
