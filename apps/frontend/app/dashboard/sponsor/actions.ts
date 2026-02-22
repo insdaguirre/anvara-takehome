@@ -4,6 +4,7 @@ import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import type { Campaign } from '@/lib/types';
 import type { CampaignFormState, CampaignFormValues } from './form-state';
+import { toCampaignQueryParams, type CampaignQueryState } from './query-state';
 
 const API_URL = globalThis.process?.env.NEXT_PUBLIC_API_URL || 'http://localhost:4291';
 const CAMPAIGN_STATUSES = [
@@ -83,10 +84,33 @@ function getCampaignFormValues(formData: FormData): CampaignFormValues {
   };
 }
 
-export async function getSponsorCampaigns(): Promise<Campaign[]> {
-  const cookieHeader = await getRequestCookieHeader();
+export interface DashboardPagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
 
-  const response = await fetch(`${API_URL}/api/campaigns`, {
+export interface PaginatedCampaignResponse {
+  data: Campaign[];
+  pagination: DashboardPagination;
+}
+
+export interface SponsorDashboardStats {
+  role: 'SPONSOR';
+  totalCampaigns: number;
+  activeCampaigns: number;
+  totalBudget: number;
+  totalSpent: number;
+}
+
+export async function getSponsorCampaigns(
+  params: CampaignQueryState
+): Promise<PaginatedCampaignResponse> {
+  const cookieHeader = await getRequestCookieHeader();
+  const query = toCampaignQueryParams(params).toString();
+
+  const response = await fetch(`${API_URL}/api/campaigns${query ? `?${query}` : ''}`, {
     headers: {
       Cookie: cookieHeader,
     },
@@ -95,6 +119,23 @@ export async function getSponsorCampaigns(): Promise<Campaign[]> {
 
   if (!response.ok) {
     throw new Error('Failed to load campaigns');
+  }
+
+  return response.json();
+}
+
+export async function getSponsorDashboardStats(): Promise<SponsorDashboardStats> {
+  const cookieHeader = await getRequestCookieHeader();
+
+  const response = await fetch(`${API_URL}/api/dashboard`, {
+    headers: {
+      Cookie: cookieHeader,
+    },
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to load dashboard stats');
   }
 
   return response.json();

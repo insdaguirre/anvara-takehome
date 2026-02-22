@@ -85,7 +85,9 @@ const apiRateLimiter = rateLimit({
 });
 
 app.use(cors(corsOptions));
-app.use('/api', apiRateLimiter);
+if (isProduction) {
+  app.use('/api', apiRateLimiter);
+}
 app.use(express.json({ limit: '20mb' }));
 
 // Mount all API routes

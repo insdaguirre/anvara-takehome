@@ -32,6 +32,7 @@ const iconRef = useRef(null);
 const textInnerRef = useRef(null);
 const textWrapRef = useRef(null);
 const [textLines, setTextLines] = useState(['Menu', 'Close']);
+const prefersReducedMotionRef = useRef(false);
 
 const openTlRef = useRef(null);
 const closeTweenRef = useRef(null);
@@ -43,6 +44,9 @@ const busyRef = useRef(false);
 const itemEntranceTweenRef = useRef(null);
 
 useLayoutEffect(() => {
+if (typeof window !== 'undefined') {
+  prefersReducedMotionRef.current = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
 const ctx = gsap.context(() => {
 const panel = panelRef.current;
 const blurLayer = blurLayerRef.current;
@@ -247,11 +251,17 @@ const animateIcon = useCallback(opening => {
 const icon = iconRef.current;
 if (!icon) return;
 spinTweenRef.current?.kill();
-if (opening) {
-spinTweenRef.current = gsap.to(icon, { rotate: 225, duration: 0.8, ease: 'power4.out', overwrite: 'auto' });
-} else {
-spinTweenRef.current = gsap.to(icon, { rotate: 0, duration: 0.35, ease: 'power3.inOut', overwrite: 'auto' });
+const targetRotate = opening ? 45 : 0;
+if (prefersReducedMotionRef.current) {
+  gsap.set(icon, { rotate: targetRotate, overwrite: 'auto' });
+  return;
 }
+spinTweenRef.current = gsap.to(icon, {
+  rotate: targetRotate,
+  duration: opening ? 0.24 : 0.2,
+  ease: 'power2.out',
+  overwrite: 'auto'
+});
 }, []);
 
 const animateColor = useCallback(
@@ -445,7 +455,7 @@ type="button"
 </span>
 </span>
 <span ref={iconRef} className="sm-toggle-icon" aria-hidden="true">
-{open ? "\u00d7" : "+"}
++
 </span>
 </button>
 </div>

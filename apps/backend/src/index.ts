@@ -27,6 +27,7 @@ app.listen(PORT, () => {
   console.log('    GET    /api/placements');
   console.log('    POST   /api/placements');
   console.log('  Dashboard:');
+  console.log('    GET    /api/dashboard');
   console.log('    GET    /api/dashboard/stats');
   console.log('  Health:');
   console.log('    GET    /api/health');
