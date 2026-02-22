@@ -6,7 +6,16 @@ import { getParam } from '../utils/helpers.js';
 const router: IRouter = Router();
 
 const AD_SLOT_TYPES = ['DISPLAY', 'VIDEO', 'NATIVE', 'NEWSLETTER', 'PODCAST'] as const;
+const VALID_AD_SLOT_SORT = [
+  'newest',
+  'oldest',
+  'price-high',
+  'price-low',
+  'name',
+  'availability',
+] as const;
 type AdSlotType = (typeof AD_SLOT_TYPES)[number];
+type AdSlotSortBy = (typeof VALID_AD_SLOT_SORT)[number];
 
 function parsePositiveNumber(value: unknown): number | null {
   const numberValue = Number(value);
@@ -26,6 +35,19 @@ function parsePositiveInteger(value: unknown): number | null {
   return numberValue;
 }
 
+function parseIntegerQuery(value: unknown): number | null {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) {
+    return null;
+  }
+
+  return parsed;
+}
+
 // GET /api/ad-slots - List current publisher's ad slots
 router.get(
   '/',
@@ -33,39 +55,74 @@ router.get(
   roleMiddleware(['PUBLISHER']),
   async (req: AuthRequest, res: Response) => {
     try {
-      const { type, available } = req.query;
-
       if (!req.user?.publisherId) {
         res.status(403).json({ error: 'Forbidden' });
         return;
       }
 
-      if (type && (typeof type !== 'string' || !AD_SLOT_TYPES.includes(type as AdSlotType))) {
-        res.status(400).json({ error: 'Invalid ad slot type filter' });
-        return;
-      }
+      const rawPage = parseIntegerQuery(req.query.page);
+      const rawLimit = parseIntegerQuery(req.query.limit);
+      const page = Math.max(1, rawPage ?? 1);
+      const limit = Math.min(100, Math.max(1, rawLimit ?? 12));
+      const skip = (page - 1) * limit;
 
-      if (available && available !== 'true' && available !== 'false') {
-        res.status(400).json({ error: 'available must be true or false' });
-        return;
-      }
+      const rawType = typeof req.query.type === 'string' ? req.query.type : undefined;
+      const type = AD_SLOT_TYPES.includes(rawType as AdSlotType)
+        ? (rawType as AdSlotType)
+        : undefined;
 
-      const adSlots = await prisma.adSlot.findMany({
-        where: {
-          publisherId: req.user.publisherId,
-          ...(type && {
-            type: type as AdSlotType,
-          }),
-          ...(available && { isAvailable: available === 'true' }),
+      const rawAvailable =
+        typeof req.query.available === 'string' ? req.query.available : undefined;
+      const available =
+        rawAvailable === 'true' ? true : rawAvailable === 'false' ? false : undefined;
+
+      const rawSortBy = typeof req.query.sortBy === 'string' ? req.query.sortBy : undefined;
+      const sortBy: AdSlotSortBy = VALID_AD_SLOT_SORT.includes(rawSortBy as AdSlotSortBy)
+        ? (rawSortBy as AdSlotSortBy)
+        : 'newest';
+
+      const orderBy =
+        sortBy === 'oldest'
+          ? { createdAt: 'asc' as const }
+          : sortBy === 'price-high'
+            ? { basePrice: 'desc' as const }
+            : sortBy === 'price-low'
+              ? { basePrice: 'asc' as const }
+              : sortBy === 'name'
+                ? { name: 'asc' as const }
+                : sortBy === 'availability'
+                  ? { isAvailable: 'desc' as const }
+                  : { createdAt: 'desc' as const };
+
+      const where = {
+        publisherId: req.user.publisherId,
+        ...(type && { type }),
+        ...(available !== undefined && { isAvailable: available }),
+      };
+
+      const [total, adSlots] = await prisma.$transaction([
+        prisma.adSlot.count({ where }),
+        prisma.adSlot.findMany({
+          where,
+          include: {
+            publisher: { select: { id: true, name: true, category: true, monthlyViews: true } },
+            _count: { select: { placements: true } },
+          },
+          orderBy,
+          skip,
+          take: limit,
+        }),
+      ]);
+
+      res.json({
+        data: adSlots,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
         },
-        include: {
-          publisher: { select: { id: true, name: true, category: true, monthlyViews: true } },
-          _count: { select: { placements: true } },
-        },
-        orderBy: { basePrice: 'desc' },
       });
-
-      res.json(adSlots);
     } catch (error) {
       console.error('Error fetching ad slots:', error);
       res.status(500).json({ error: 'Failed to fetch ad slots' });

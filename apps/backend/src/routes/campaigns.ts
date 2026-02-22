@@ -13,8 +13,17 @@ const CAMPAIGN_STATUSES = [
   'COMPLETED',
   'CANCELLED',
 ] as const;
+const VALID_CAMPAIGN_SORT = [
+  'newest',
+  'oldest',
+  'budget-high',
+  'budget-low',
+  'name',
+  'status',
+] as const;
 
 type CampaignStatus = (typeof CAMPAIGN_STATUSES)[number];
+type CampaignSortBy = (typeof VALID_CAMPAIGN_SORT)[number];
 
 function parseDateInput(value: unknown): Date | null {
   if (typeof value !== 'string' && !(value instanceof Date)) return null;
@@ -42,6 +51,19 @@ function parseNonNegativeNumber(value: unknown): number | null {
   return numberValue;
 }
 
+function parseIntegerQuery(value: unknown): number | null {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) {
+    return null;
+  }
+
+  return parsed;
+}
+
 // GET /api/campaigns - List all campaigns
 router.get(
   '/',
@@ -49,31 +71,68 @@ router.get(
   roleMiddleware(['SPONSOR']),
   async (req: AuthRequest, res: Response) => {
     try {
-      const { status } = req.query;
-
       if (!req.user?.sponsorId) {
         res.status(403).json({ error: 'Forbidden' });
         return;
       }
 
-      if (status && (typeof status !== 'string' || !CAMPAIGN_STATUSES.includes(status as CampaignStatus))) {
-        res.status(400).json({ error: 'Invalid campaign status filter' });
-        return;
-      }
+      const rawPage = parseIntegerQuery(req.query.page);
+      const rawLimit = parseIntegerQuery(req.query.limit);
+      const page = Math.max(1, rawPage ?? 1);
+      const limit = Math.min(100, Math.max(1, rawLimit ?? 12));
+      const skip = (page - 1) * limit;
 
-      const campaigns = await prisma.campaign.findMany({
-        where: {
-          ...(status && { status: status as CampaignStatus }),
-          sponsorId: req.user.sponsorId,
+      const rawStatus = typeof req.query.status === 'string' ? req.query.status : undefined;
+      const status = CAMPAIGN_STATUSES.includes(rawStatus as CampaignStatus)
+        ? (rawStatus as CampaignStatus)
+        : undefined;
+
+      const rawSortBy = typeof req.query.sortBy === 'string' ? req.query.sortBy : undefined;
+      const sortBy: CampaignSortBy = VALID_CAMPAIGN_SORT.includes(rawSortBy as CampaignSortBy)
+        ? (rawSortBy as CampaignSortBy)
+        : 'newest';
+
+      const orderBy =
+        sortBy === 'oldest'
+          ? { createdAt: 'asc' as const }
+          : sortBy === 'budget-high'
+            ? { budget: 'desc' as const }
+            : sortBy === 'budget-low'
+              ? { budget: 'asc' as const }
+              : sortBy === 'name'
+                ? { name: 'asc' as const }
+                : sortBy === 'status'
+                  ? { status: 'asc' as const }
+                  : { createdAt: 'desc' as const };
+
+      const where = {
+        sponsorId: req.user.sponsorId,
+        ...(status && { status }),
+      };
+
+      const [total, campaigns] = await prisma.$transaction([
+        prisma.campaign.count({ where }),
+        prisma.campaign.findMany({
+          where,
+          include: {
+            sponsor: { select: { id: true, name: true, logo: true } },
+            _count: { select: { creatives: true, placements: true } },
+          },
+          orderBy,
+          skip,
+          take: limit,
+        }),
+      ]);
+
+      res.json({
+        data: campaigns,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
         },
-        include: {
-          sponsor: { select: { id: true, name: true, logo: true } },
-          _count: { select: { creatives: true, placements: true } },
-        },
-        orderBy: { createdAt: 'desc' },
       });
-
-      res.json(campaigns);
     } catch (error) {
       console.error('Error fetching campaigns:', error);
       res.status(500).json({ error: 'Failed to fetch campaigns' });

@@ -4,6 +4,7 @@ import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import type { AdSlot } from '@/lib/types';
 import type { AdSlotFormState, AdSlotFormValues } from './form-state';
+import { toAdSlotQueryParams, type AdSlotQueryState } from './query-state';
 
 const API_URL = globalThis.process?.env.NEXT_PUBLIC_API_URL || 'http://localhost:4291';
 const AD_SLOT_TYPES = ['DISPLAY', 'VIDEO', 'NATIVE', 'NEWSLETTER', 'PODCAST'] as const;
@@ -61,10 +62,32 @@ function getAdSlotFormValues(formData: FormData): AdSlotFormValues {
   };
 }
 
-export async function getPublisherAdSlots(): Promise<AdSlot[]> {
-  const cookieHeader = await getRequestCookieHeader();
+export interface DashboardPagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
 
-  const response = await fetch(`${API_URL}/api/ad-slots`, {
+export interface PaginatedAdSlotResponse {
+  data: AdSlot[];
+  pagination: DashboardPagination;
+}
+
+export interface PublisherDashboardStats {
+  role: 'PUBLISHER';
+  totalSlots: number;
+  availableSlots: number;
+  inventoryValue: number;
+}
+
+export async function getPublisherAdSlots(
+  params: AdSlotQueryState
+): Promise<PaginatedAdSlotResponse> {
+  const cookieHeader = await getRequestCookieHeader();
+  const query = toAdSlotQueryParams(params).toString();
+
+  const response = await fetch(`${API_URL}/api/ad-slots${query ? `?${query}` : ''}`, {
     headers: {
       Cookie: cookieHeader,
     },
@@ -73,6 +96,23 @@ export async function getPublisherAdSlots(): Promise<AdSlot[]> {
 
   if (!response.ok) {
     throw new Error('Failed to load ad slots');
+  }
+
+  return response.json();
+}
+
+export async function getPublisherDashboardStats(): Promise<PublisherDashboardStats> {
+  const cookieHeader = await getRequestCookieHeader();
+
+  const response = await fetch(`${API_URL}/api/dashboard`, {
+    headers: {
+      Cookie: cookieHeader,
+    },
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to load dashboard stats');
   }
 
   return response.json();

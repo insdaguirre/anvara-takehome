@@ -1,6 +1,13 @@
 const API_URL = globalThis.process?.env.NEXT_PUBLIC_API_URL || 'http://localhost:4291';
 
-export type ApiErrorType = 'network' | 'auth' | 'not_found' | 'server' | 'validation' | 'unknown';
+export type ApiErrorType =
+  | 'network'
+  | 'auth'
+  | 'not_found'
+  | 'server'
+  | 'validation'
+  | 'rate_limit'
+  | 'unknown';
 
 interface ApiErrorOptions {
   type: ApiErrorType;
@@ -43,6 +50,7 @@ function mapStatusToErrorType(status: number): ApiErrorType {
   if (status === 400) return 'validation';
   if (status === 401 || status === 403) return 'auth';
   if (status === 404) return 'not_found';
+  if (status === 429) return 'rate_limit';
   if (status >= 500) return 'server';
   return 'unknown';
 }
@@ -53,6 +61,7 @@ function getFallbackMessage(type: ApiErrorType): string {
   if (type === 'not_found') return 'This resource could not be found.';
   if (type === 'server') return 'Our servers are temporarily unavailable. Please try again in a moment.';
   if (type === 'validation') return 'Please review your input and try again.';
+  if (type === 'rate_limit') return 'Too many requests. Please try again shortly.';
   return 'Something went wrong. Please try again.';
 }
 
@@ -105,13 +114,13 @@ export async function api<T>(endpoint: string, options?: ApiRequestOptions): Pro
 }
 
 // Campaigns
-export const getCampaigns = () => api<unknown[]>('/api/campaigns');
+export const getCampaigns = () => api<PaginatedMarketplaceResponse<unknown>>('/api/campaigns');
 export const getCampaign = (id: string) => api<unknown>(`/api/campaigns/${id}`);
 export const createCampaign = (data: unknown) =>
   api('/api/campaigns', { method: 'POST', body: JSON.stringify(data) });
 
 // Ad Slots
-export const getAdSlots = () => api<unknown[]>('/api/ad-slots');
+export const getAdSlots = () => api<PaginatedMarketplaceResponse<unknown>>('/api/ad-slots');
 export const getAdSlot = (id: string) => api<unknown>(`/api/ad-slots/${id}`);
 export const createAdSlot = (data: unknown) =>
   api('/api/ad-slots', { method: 'POST', body: JSON.stringify(data) });

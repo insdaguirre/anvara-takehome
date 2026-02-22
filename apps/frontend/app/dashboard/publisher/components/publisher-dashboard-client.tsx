@@ -9,9 +9,26 @@ import { useDashboardToasts } from '../../components/use-dashboard-toasts';
 import headingGradientStyles from '../../components/dashboard-heading-gradient.module.css';
 import { AdSlotList } from './ad-slot-list';
 import { CreateAdSlotButton } from './create-ad-slot-button';
+import type { AdSlotQueryState } from '../query-state';
+
+interface DashboardPagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+interface PublisherDashboardStats {
+  totalSlots: number;
+  availableSlots: number;
+  inventoryValue: number;
+}
 
 interface PublisherDashboardClientProps {
   adSlots: AdSlot[];
+  pagination: DashboardPagination;
+  queryState: AdSlotQueryState;
+  stats: PublisherDashboardStats;
   error?: string | null;
 }
 
@@ -40,52 +57,64 @@ function StatCard({
   );
 }
 
-export function PublisherDashboardClient({ adSlots, error }: PublisherDashboardClientProps) {
+export function PublisherDashboardClient({
+  adSlots,
+  pagination,
+  queryState,
+  stats,
+  error,
+}: PublisherDashboardClientProps) {
   const { toasts, pushToast, dismissToast } = useDashboardToasts();
-  const totalSlots = adSlots.length;
-  const availableSlots = adSlots.filter((slot) => slot.isAvailable).length;
-  const inventoryValue = adSlots.reduce((total, slot) => total + Number(slot.basePrice), 0);
 
   return (
     <div className="space-y-6">
       <section
         className={`rounded-2xl border border-[var(--color-border)] p-6 shadow-sm ${overviewPanelStyles.overviewPanel}`}
       >
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[var(--color-foreground)]">
-            <span className={headingGradientStyles.landingCtaHeadingGradient}>Publisher Dashboard</span>
-          </h1>
-          <p className="mt-1 text-sm text-[var(--color-muted)]">
-            Manage your ad inventory, keep listings current, and track availability at a glance.
-          </p>
-        </div>
-        <div className="mt-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-[var(--color-foreground)]">
+              <span className={headingGradientStyles.landingCtaHeadingGradient}>
+                Publisher Dashboard
+              </span>
+            </h1>
+            <p className="mt-1 text-sm text-[var(--color-muted)]">
+              Manage your ad inventory, keep listings current, and track availability at a glance.
+            </p>
+          </div>
           <CreateAdSlotButton onToast={pushToast} />
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
           <StatCard
             title="Total Slots"
-            value={String(totalSlots)}
+            value={String(stats.totalSlots)}
             helperText="All inventory records"
             icon={LayoutGrid}
           />
           <StatCard
             title="Available"
-            value={String(availableSlots)}
+            value={String(stats.availableSlots)}
             helperText="Open for sponsor bookings"
             icon={BadgeCheck}
           />
           <StatCard
             title="Monthly Inventory"
-            value={formatPrice(inventoryValue)}
+            value={formatPrice(Number(stats.inventoryValue))}
             helperText="Combined listing value"
             icon={DollarSign}
           />
         </div>
       </section>
 
-      <AdSlotList adSlots={adSlots} error={error} onToast={pushToast} />
+      <AdSlotList
+        adSlots={adSlots}
+        pagination={pagination}
+        queryState={queryState}
+        totalSlots={stats.totalSlots}
+        error={error}
+        onToast={pushToast}
+      />
       <DashboardToastRegion toasts={toasts} onDismiss={dismissToast} />
     </div>
   );

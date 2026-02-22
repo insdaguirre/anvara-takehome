@@ -93,7 +93,7 @@ export function NavClient({ user, role }: NavClientProps) {
         <GlassSurface
           width="100%"
           height={72}
-          borderRadius={999}
+          borderRadius={12}
           backgroundOpacity={0.14}
           saturation={1.35}
           brightness={55}
@@ -163,7 +163,7 @@ export function NavClient({ user, role }: NavClientProps) {
           <GlassSurface
             width="100%"
             height={72}
-            borderRadius={999}
+            borderRadius={12}
             backgroundOpacity={0.14}
             saturation={1.35}
             brightness={55}

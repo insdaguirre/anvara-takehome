@@ -1,40 +1,66 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Inbox } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Inbox } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { EmptyState } from '@/app/components/EmptyState';
 import { ErrorState } from '@/app/components/ErrorState';
 import { analytics } from '@/lib/analytics';
+import { buildPageWindows } from '@/lib/pagination';
 import type { Campaign } from '@/lib/types';
 import type { DashboardToastInput } from '../../components/use-dashboard-toasts';
+import {
+  CAMPAIGN_PAGE_SIZE_OPTIONS,
+  CAMPAIGN_SORT_OPTIONS,
+  CAMPAIGN_STATUS_FILTERS,
+  toCampaignQueryParams,
+  type CampaignQueryState,
+  type CampaignSortBy,
+  type CampaignStatusFilter,
+} from '../query-state';
 import { CampaignCard } from './campaign-card';
 
-// UI-only component. Expects fully resolved data from parent.
 interface CampaignListProps {
   campaigns: Campaign[];
+  pagination: { page: number; limit: number; total: number; totalPages: number };
+  queryState: CampaignQueryState;
   error?: string | null;
   onToast(toast: DashboardToastInput): void;
 }
 
-type SortBy = 'newest' | 'oldest' | 'budget-high' | 'budget-low' | 'name' | 'status';
-
-const PAGE_SIZE_OPTIONS = [6, 12, 24] as const;
-
-function getCreatedAtValue(campaign: Campaign): number {
-  const createdAt = (campaign as Campaign & { createdAt?: string }).createdAt ?? campaign.startDate;
-  const time = new Date(createdAt).getTime();
-  return Number.isNaN(time) ? 0 : time;
+function formatStatusLabel(status: CampaignStatusFilter): string {
+  if (status === 'ALL') return 'All statuses';
+  return status
+    .split('_')
+    .map((segment) => segment.charAt(0) + segment.slice(1).toLowerCase())
+    .join(' ');
 }
 
-export function CampaignList({ campaigns, error, onToast }: CampaignListProps) {
+function formatSortLabel(sortBy: CampaignSortBy): string {
+  if (sortBy === 'newest') return 'Newest';
+  if (sortBy === 'oldest') return 'Oldest';
+  if (sortBy === 'budget-high') return 'Budget: High to Low';
+  if (sortBy === 'budget-low') return 'Budget: Low to High';
+  if (sortBy === 'name') return 'Name';
+  return 'Status';
+}
+
+export function CampaignList({ campaigns, pagination, queryState, error, onToast }: CampaignListProps) {
   const router = useRouter();
   const shouldReduceMotion = useReducedMotion();
-  const [sortBy, setSortBy] = useState<SortBy>('newest');
-  const [page, setPage] = useState(1);
-  const [pageContext, setPageContext] = useState(() => `newest:${campaigns.length}`);
-  const [pageSize, setPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(12);
+  const currentPage = pagination.page;
+  const totalPages = pagination.totalPages;
+  const hasVisibleResults = campaigns.length > 0;
+  const from = hasVisibleResults ? (currentPage - 1) * pagination.limit + 1 : 0;
+  const to = hasVisibleResults ? Math.min(currentPage * pagination.limit, pagination.total) : 0;
+  const pages = buildPageWindows(currentPage, totalPages);
+
+  const btnBase =
+    'inline-flex h-8 min-w-[2rem] items-center justify-center rounded-md px-2 text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]';
+  const btnActive = `${btnBase} bg-[var(--color-primary)] text-white font-semibold`;
+  const btnInactive = `${btnBase} border border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-foreground)] hover:bg-[var(--color-border)] disabled:cursor-not-allowed disabled:opacity-60`;
+
   const handleScrollToCreateButton = () => {
     const createButton = document.querySelector<HTMLButtonElement>(
       '[aria-controls="create-campaign-form"]'
@@ -43,6 +69,19 @@ export function CampaignList({ campaigns, error, onToast }: CampaignListProps) {
     createButton.scrollIntoView({ behavior: 'smooth', block: 'center' });
     createButton.focus();
   };
+
+  function navigate(next: Partial<CampaignQueryState>) {
+    const shouldResetPage =
+      next.sortBy !== undefined || next.status !== undefined || next.limit !== undefined;
+    const nextState: CampaignQueryState = {
+      ...queryState,
+      ...(shouldResetPage ? { page: 1 } : {}),
+      ...next,
+    };
+
+    const params = toCampaignQueryParams(nextState).toString();
+    router.push(`/dashboard/sponsor${params ? `?${params}` : ''}`);
+  }
 
   useEffect(() => {
     if (!error) return;
@@ -62,39 +101,6 @@ export function CampaignList({ campaigns, error, onToast }: CampaignListProps) {
     };
   }, [router]);
 
-  // TODO: Add optimistic updates when creating/editing campaigns
-
-  const sortedCampaigns = useMemo(() => {
-    const sorted = [...campaigns];
-    sorted.sort((a, b) => {
-      switch (sortBy) {
-        case 'oldest':
-          return getCreatedAtValue(a) - getCreatedAtValue(b);
-        case 'budget-high':
-          return Number(b.budget) - Number(a.budget);
-        case 'budget-low':
-          return Number(a.budget) - Number(b.budget);
-        case 'name':
-          return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
-        case 'status':
-          return a.status.localeCompare(b.status);
-        case 'newest':
-        default:
-          return getCreatedAtValue(b) - getCreatedAtValue(a);
-      }
-    });
-    return sorted;
-  }, [campaigns, sortBy]);
-
-  const currentPageContext = `${sortBy}:${campaigns.length}`;
-  const isPageContextStale = pageContext !== currentPageContext;
-  const totalPages = Math.max(1, Math.ceil(sortedCampaigns.length / pageSize));
-  const currentPage = Math.min(isPageContextStale ? 1 : page, totalPages);
-  const visibleCampaigns = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return sortedCampaigns.slice(start, start + pageSize);
-  }, [currentPage, pageSize, sortedCampaigns]);
-
   if (error) {
     return (
       <ErrorState
@@ -113,7 +119,18 @@ export function CampaignList({ campaigns, error, onToast }: CampaignListProps) {
     );
   }
 
-  if (campaigns.length === 0) {
+  if (pagination.total === 0) {
+    if (queryState.status !== 'ALL') {
+      return (
+        <EmptyState
+          icon={Inbox}
+          title="No matching campaigns"
+          description={`No campaigns found with status ${formatStatusLabel(queryState.status)}.`}
+          action={{ label: 'Clear filters', onClick: () => navigate({ status: 'ALL' }) }}
+        />
+      );
+    }
+
     return (
       <EmptyState
         icon={Inbox}
@@ -126,29 +143,72 @@ export function CampaignList({ campaigns, error, onToast }: CampaignListProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <label htmlFor="campaign-sort" className="text-sm font-medium text-[var(--color-muted)]">
-          Sort by
-        </label>
-        <select
-          id="campaign-sort"
-          value={sortBy}
-          onChange={(event) => {
-            const nextSortBy = event.target.value as SortBy;
-            setSortBy(nextSortBy);
-            setPage(1);
-            setPageContext(`${nextSortBy}:${campaigns.length}`);
-          }}
-          className="rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-foreground)]"
-        >
-          <option value="newest">Newest</option>
-          <option value="oldest">Oldest</option>
-          <option value="budget-high">Budget: High to Low</option>
-          <option value="budget-low">Budget: Low to High</option>
-          <option value="name">Name</option>
-          <option value="status">Status</option>
-        </select>
+      <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] px-4 py-3 shadow-sm">
+        <div className="flex flex-wrap items-center gap-3 lg:justify-between">
+          <div className="flex flex-wrap items-center gap-3">
+            <label htmlFor="campaign-status" className="text-sm font-medium text-[var(--color-muted)]">
+              Status
+            </label>
+            <select
+              id="campaign-status"
+              value={queryState.status}
+              onChange={(event) => navigate({ status: event.target.value as CampaignStatusFilter })}
+              className="rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-foreground)]"
+            >
+              {CAMPAIGN_STATUS_FILTERS.map((status) => (
+                <option key={status} value={status}>
+                  {formatStatusLabel(status)}
+                </option>
+              ))}
+            </select>
+
+            <label htmlFor="campaign-sort" className="text-sm font-medium text-[var(--color-muted)]">
+              Sort
+            </label>
+            <select
+              id="campaign-sort"
+              value={queryState.sortBy}
+              onChange={(event) => navigate({ sortBy: event.target.value as CampaignSortBy })}
+              className="rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-foreground)]"
+            >
+              {CAMPAIGN_SORT_OPTIONS.map((sortBy) => (
+                <option key={sortBy} value={sortBy}>
+                  {formatSortLabel(sortBy)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="ml-auto flex items-center gap-2 text-sm">
+            <span className="font-medium text-[var(--color-muted)]">VIEW:</span>
+            <div className="inline-flex items-center gap-1">
+              {CAMPAIGN_PAGE_SIZE_OPTIONS.map((option) => {
+                const isActive = option === queryState.limit;
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => navigate({ limit: option })}
+                    disabled={isActive}
+                    aria-pressed={isActive}
+                    className={`rounded-md px-2 py-1 text-sm transition-colors ${
+                      isActive
+                        ? 'bg-[var(--color-primary)] text-white'
+                        : 'text-[var(--color-foreground)] hover:bg-[var(--color-border)]'
+                    } disabled:cursor-not-allowed disabled:opacity-60`}
+                  >
+                    {option}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       </div>
+
+      <p className="text-sm text-[var(--color-showing-text)]">
+        Showing {from}-{to} of {pagination.total} campaigns
+      </p>
 
       <motion.div
         className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
@@ -158,7 +218,7 @@ export function CampaignList({ campaigns, error, onToast }: CampaignListProps) {
         }
       >
         <AnimatePresence initial={false}>
-          {visibleCampaigns.map((campaign) => (
+          {campaigns.map((campaign) => (
             <motion.div
               key={campaign.id}
               layout={!shouldReduceMotion}
@@ -177,54 +237,75 @@ export function CampaignList({ campaigns, error, onToast }: CampaignListProps) {
         </AnimatePresence>
       </motion.div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <label htmlFor="campaign-page-size" className="text-sm font-medium text-[var(--color-muted)]">
-            Campaigns per page
-          </label>
-          <select
-            id="campaign-page-size"
-            value={pageSize}
-            onChange={(event) => {
-              setPageSize(Number(event.target.value) as (typeof PAGE_SIZE_OPTIONS)[number]);
-              setPageContext(currentPageContext);
-            }}
-            className="rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-foreground)]"
-          >
-            {PAGE_SIZE_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="flex items-center gap-2">
+      <div className="relative flex items-center justify-center">
+        <nav aria-label="Campaign pagination" className="flex items-center gap-1">
           <button
             type="button"
-            onClick={() => {
-              setPage(Math.max(1, currentPage - 1));
-              setPageContext(currentPageContext);
-            }}
+            onClick={() => navigate({ page: Math.max(1, currentPage - 1) })}
             disabled={currentPage <= 1}
-            className="rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
+            aria-label="Previous page"
+            className={btnInactive}
           >
-            Prev
+            <ChevronLeft className="h-4 w-4" />
           </button>
-          <span aria-live="polite" className="text-sm text-[var(--color-muted)]">
-            Page {currentPage} of {totalPages}
-          </span>
+
+          {pages.map((pageNumber, index) =>
+            pageNumber === 'ellipsis' ? (
+              <span
+                key={`ellipsis-${index}`}
+                className="inline-flex h-8 w-8 items-center justify-center text-sm text-[var(--color-muted)]"
+              >
+                …
+              </span>
+            ) : (
+              <button
+                key={pageNumber}
+                type="button"
+                onClick={() => navigate({ page: pageNumber })}
+                aria-label={`Page ${pageNumber}`}
+                aria-current={pageNumber === currentPage ? 'page' : undefined}
+                className={pageNumber === currentPage ? btnActive : btnInactive}
+              >
+                {pageNumber}
+              </button>
+            )
+          )}
+
           <button
             type="button"
-            onClick={() => {
-              setPage(Math.min(totalPages, currentPage + 1));
-              setPageContext(currentPageContext);
-            }}
+            onClick={() => navigate({ page: Math.min(Math.max(1, totalPages), currentPage + 1) })}
             disabled={currentPage >= totalPages}
-            className="rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
+            aria-label="Next page"
+            className={btnInactive}
           >
-            Next
+            <ChevronRight className="h-4 w-4" />
           </button>
+        </nav>
+
+        <div className="absolute right-0 hidden items-center gap-2 text-sm sm:flex">
+          <span className="font-medium text-[var(--color-muted)]">VIEW:</span>
+          <div className="inline-flex items-center gap-1">
+            {CAMPAIGN_PAGE_SIZE_OPTIONS.map((option) => {
+              const isActive = option === queryState.limit;
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => navigate({ limit: option })}
+                  disabled={isActive}
+                  aria-pressed={isActive}
+                  aria-label={`Show ${option} per page`}
+                  className={`rounded-md px-2 py-1 text-sm transition-colors ${
+                    isActive
+                      ? 'bg-[var(--color-primary)] text-white'
+                      : 'text-[var(--color-foreground)] hover:bg-[var(--color-border)]'
+                  } disabled:cursor-not-allowed disabled:opacity-60`}
+                >
+                  {option}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>

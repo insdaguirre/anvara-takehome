@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { ChevronLeft, ChevronRight, Filter, Store } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Filter, Search, Store } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import { EmptyState } from '@/app/components/EmptyState';
 import { ErrorState } from '@/app/components/ErrorState';
@@ -16,6 +16,7 @@ import {
 } from '@/lib/api';
 import { analytics } from '@/lib/analytics';
 import { formatCompactNumber, formatPrice } from '@/lib/format';
+import { buildPageWindows } from '@/lib/pagination';
 import { MarketplaceFilters, defaultFilters, type FilterState } from './marketplace-filters';
 import {
   MARKETPLACE_PAGE_SIZE_OPTIONS,
@@ -93,38 +94,12 @@ interface AdSlotGridProps {
 
 interface PaginationProps {
   pagination: MarketplacePagination;
-  pageSize: PageSize;
   onPageChange: (page: number) => void;
-  onPageSizeChange: (size: PageSize) => void;
   disabled: boolean;
 }
 
-function buildPageWindows(current: number, total: number): (number | 'ellipsis')[] {
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-
-  const pages: (number | 'ellipsis')[] = [1];
-
-  const left = Math.max(2, current - 1);
-  const right = Math.min(total - 1, current + 1);
-
-  if (left > 2) pages.push('ellipsis');
-  for (let p = left; p <= right; p++) pages.push(p);
-  if (right < total - 1) pages.push('ellipsis');
-
-  pages.push(total);
-  return pages;
-}
-
-function PaginationControls({
-  pagination,
-  pageSize,
-  onPageChange,
-  onPageSizeChange,
-  disabled,
-}: PaginationProps) {
-  const { page, total, totalPages } = pagination;
-  const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
-  const to = Math.min(page * pageSize, total);
+function PaginationControls({ pagination, onPageChange, disabled }: PaginationProps) {
+  const { page, totalPages } = pagination;
   const pages = buildPageWindows(page, totalPages);
 
   const btnBase =
@@ -133,78 +108,50 @@ function PaginationControls({
   const btnInactive = `${btnBase} border border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-foreground)] hover:bg-[var(--color-border)] disabled:opacity-40 disabled:cursor-not-allowed`;
 
   return (
-    <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-between">
-      <div className="flex items-center gap-3 text-sm text-[var(--color-muted)]">
-        <span className="text-black">
-          {total === 0
-            ? 'No results'
-            : `Showing ${from}–${to} of ${total.toLocaleString()} ad slots`}
-        </span>
-        <label className="flex items-center gap-1.5">
-          <span className="sr-only">Results per page</span>
-          <select
-            aria-label="Results per page"
-            value={pageSize}
-            onChange={(e) => onPageSizeChange(Number(e.target.value) as PageSize)}
+    <nav aria-label="Pagination" className="flex items-center justify-center gap-1">
+      <button
+        type="button"
+        onClick={() => onPageChange(page - 1)}
+        disabled={disabled || page <= 1}
+        aria-label="Previous page"
+        className={btnInactive}
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </button>
+
+      {pages.map((p, i) =>
+        p === 'ellipsis' ? (
+          <span
+            key={`ellipsis-${i}`}
+            className="inline-flex h-8 w-8 items-center justify-center text-sm text-[var(--color-muted)]"
+          >
+            …
+          </span>
+        ) : (
+          <button
+            key={p}
+            type="button"
+            onClick={() => onPageChange(p)}
             disabled={disabled}
-            className="rounded-md border border-[var(--color-border)] bg-[var(--color-background)] px-2 py-1 text-sm text-[var(--color-foreground)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)] disabled:opacity-50"
+            aria-label={`Page ${p}`}
+            aria-current={p === page ? 'page' : undefined}
+            className={p === page ? btnActive : btnInactive}
           >
-            {PAGE_SIZE_OPTIONS.map((n) => (
-              <option key={n} value={n}>
-                {n} / page
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      {totalPages > 1 && (
-        <nav aria-label="Pagination" className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => onPageChange(page - 1)}
-            disabled={disabled || page <= 1}
-            aria-label="Previous page"
-            className={btnInactive}
-          >
-            <ChevronLeft className="h-4 w-4" />
+            {p}
           </button>
-
-          {pages.map((p, i) =>
-            p === 'ellipsis' ? (
-              <span
-                key={`ellipsis-${i}`}
-                className="inline-flex h-8 w-8 items-center justify-center text-sm text-[var(--color-muted)]"
-              >
-                …
-              </span>
-            ) : (
-              <button
-                key={p}
-                type="button"
-                onClick={() => onPageChange(p)}
-                disabled={disabled}
-                aria-label={`Page ${p}`}
-                aria-current={p === page ? 'page' : undefined}
-                className={p === page ? btnActive : btnInactive}
-              >
-                {p}
-              </button>
-            )
-          )}
-
-          <button
-            type="button"
-            onClick={() => onPageChange(page + 1)}
-            disabled={disabled || page >= totalPages}
-            aria-label="Next page"
-            className={btnInactive}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </nav>
+        )
       )}
-    </div>
+
+      <button
+        type="button"
+        onClick={() => onPageChange(page + 1)}
+        disabled={disabled || page >= totalPages}
+        aria-label="Next page"
+        className={btnInactive}
+      >
+        <ChevronRight className="h-4 w-4" />
+      </button>
+    </nav>
   );
 }
 
@@ -250,6 +197,8 @@ export function AdSlotGrid({ initialResponse, initialQueryState }: AdSlotGridPro
   );
 
   const hasTrackedView = useRef(false);
+  const hasMountedSearchRef = useRef(false);
+  const latestResultCountRef = useRef(initialResponse.pagination.total);
   const shouldReduceMotion = useReducedMotion();
   const fetchIdRef = useRef(0);
   const lastNavigationQueryRef = useRef<string | null>(null);
@@ -394,6 +343,25 @@ export function AdSlotGrid({ initialResponse, initialQueryState }: AdSlotGridPro
   }, [error, loading, pagination.total]);
 
   useEffect(() => {
+    latestResultCountRef.current = pagination.total;
+  }, [pagination.total]);
+
+  useEffect(() => {
+    if (!hasMountedSearchRef.current) {
+      hasMountedSearchRef.current = true;
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      analytics.searchQuery(filters.search, latestResultCountRef.current);
+    }, 500);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [filters.search]);
+
+  useEffect(() => {
     if (error) analytics.marketplaceError(error.message);
   }, [error]);
 
@@ -405,6 +373,18 @@ export function AdSlotGrid({ initialResponse, initialQueryState }: AdSlotGridPro
       });
     },
     [applyQueryState, pageSize]
+  );
+
+  const handleSearchChange = useCallback(
+    (search: string) => {
+      const next = { ...filters, search };
+      applyQueryState(buildQueryState(1, pageSize, next), {
+        syncUrl: true,
+        fetch: true,
+      });
+      analytics.filterApply('search', search.trim());
+    },
+    [applyQueryState, filters, pageSize]
   );
 
   const handlePageChange = useCallback(
@@ -433,10 +413,43 @@ export function AdSlotGrid({ initialResponse, initialQueryState }: AdSlotGridPro
     loadPage(page, pageSize, filters);
   }, [filters, loadPage, page, pageSize]);
 
+  const hasResults = pagination.total > 0;
+  const from = hasResults ? (pagination.page - 1) * pageSize + 1 : 0;
+  const to = hasResults ? Math.min(pagination.page * pageSize, pagination.total) : 0;
+
   if (loading && slots.length === 0) {
     return (
       <div className="space-y-4">
-        <MarketplaceFilters filters={filters} onChange={handleFilterChange} />
+        <div
+          className={`rounded-xl border bg-[var(--color-background)] ${
+            filters.search.trim() ? 'border-[var(--color-primary)]' : 'border-[var(--color-border)]'
+          }`}
+        >
+          <div className="relative">
+            <input
+              type="search"
+              value={filters.search}
+              onChange={(event) => handleSearchChange(event.target.value)}
+              placeholder="Search listings..."
+              aria-label="Search listings"
+              disabled={loading}
+              className="w-full rounded-t-xl border-b border-[var(--color-border)] bg-transparent py-3 pl-4 pr-10 text-sm text-[var(--color-foreground)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-50"
+            />
+            <Search
+              className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-muted)]"
+              aria-hidden="true"
+            />
+          </div>
+          <div className="p-4">
+            <MarketplaceFilters
+              filters={filters}
+              pageSize={pageSize}
+              onPageSizeChange={handlePageSizeChange}
+              onChange={handleFilterChange}
+              disabled={loading}
+            />
+          </div>
+        </div>
         <SkeletonCard
           variant="marketplace"
           count={pageSize}
@@ -448,18 +461,85 @@ export function AdSlotGrid({ initialResponse, initialQueryState }: AdSlotGridPro
 
   if (error && slots.length === 0) {
     return (
-      <ErrorState
-        variant="network"
-        title="Unable to load marketplace listings"
-        message={isOffline ? 'Check your internet connection and try again.' : error.message}
-        onRetry={handleRetry}
-      />
+      <div className="space-y-4">
+        <div
+          className={`rounded-xl border bg-[var(--color-background)] ${
+            filters.search.trim() ? 'border-[var(--color-primary)]' : 'border-[var(--color-border)]'
+          }`}
+        >
+          <div className="relative">
+            <input
+              type="search"
+              value={filters.search}
+              onChange={(event) => handleSearchChange(event.target.value)}
+              placeholder="Search listings..."
+              aria-label="Search listings"
+              disabled={loading}
+              className="w-full rounded-t-xl border-b border-[var(--color-border)] bg-transparent py-3 pl-4 pr-10 text-sm text-[var(--color-foreground)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-50"
+            />
+            <Search
+              className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-muted)]"
+              aria-hidden="true"
+            />
+          </div>
+          <div className="p-4">
+            <MarketplaceFilters
+              filters={filters}
+              pageSize={pageSize}
+              onPageSizeChange={handlePageSizeChange}
+              onChange={handleFilterChange}
+              disabled={loading}
+            />
+          </div>
+        </div>
+        <ErrorState
+          variant="network"
+          title="Unable to load marketplace listings"
+          message={isOffline ? 'Check your internet connection and try again.' : error.message}
+          onRetry={handleRetry}
+        />
+      </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      <MarketplaceFilters filters={filters} onChange={handleFilterChange} />
+      <div
+        className={`rounded-xl border bg-[var(--color-background)] ${
+          filters.search.trim() ? 'border-[var(--color-primary)]' : 'border-[var(--color-border)]'
+        }`}
+      >
+        <div className="relative">
+          <input
+            type="search"
+            value={filters.search}
+            onChange={(event) => handleSearchChange(event.target.value)}
+            placeholder="Search listings..."
+            aria-label="Search listings"
+            disabled={loading}
+            className="w-full rounded-t-xl border-b border-[var(--color-border)] bg-transparent py-3 pl-4 pr-10 text-sm text-[var(--color-foreground)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-50"
+          />
+          <Search
+            className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-muted)]"
+            aria-hidden="true"
+          />
+        </div>
+        <div className="p-4">
+          <MarketplaceFilters
+            filters={filters}
+            pageSize={pageSize}
+            onPageSizeChange={handlePageSizeChange}
+            onChange={handleFilterChange}
+            disabled={loading}
+          />
+        </div>
+      </div>
+
+      {hasResults && (
+        <p className="text-sm text-[var(--color-showing-text)]">
+          Showing {from}-{to} of {pagination.total.toLocaleString()} ad slots
+        </p>
+      )}
 
       {error && slots.length > 0 && (
         <div
@@ -597,13 +677,34 @@ export function AdSlotGrid({ initialResponse, initialQueryState }: AdSlotGridPro
       )}
 
       {(pagination.total > 0 || pagination.totalPages > 0) && (
-        <PaginationControls
-          pagination={pagination}
-          pageSize={pageSize}
-          onPageChange={handlePageChange}
-          onPageSizeChange={handlePageSizeChange}
-          disabled={loading}
-        />
+        <div className="relative flex items-center justify-center">
+          <PaginationControls pagination={pagination} onPageChange={handlePageChange} disabled={loading} />
+          <div className="absolute right-0 hidden items-center gap-2 text-sm sm:flex">
+            <span className="font-medium text-[var(--color-muted)]">VIEW:</span>
+            <div className="inline-flex items-center gap-1">
+              {PAGE_SIZE_OPTIONS.map((option) => {
+                const isActive = option === pageSize;
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => handlePageSizeChange(option)}
+                    disabled={loading || isActive}
+                    aria-pressed={isActive}
+                    aria-label={`Show ${option} per page`}
+                    className={`rounded-md px-2 py-1 text-sm transition-colors ${
+                      isActive
+                        ? 'bg-[var(--color-primary)] text-white'
+                        : 'text-[var(--color-foreground)] hover:bg-[var(--color-border)]'
+                    } disabled:cursor-not-allowed disabled:opacity-60`}
+                  >
+                    {option}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
