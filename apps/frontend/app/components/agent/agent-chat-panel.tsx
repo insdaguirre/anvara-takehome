@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useAgent } from './agent-provider';
 
 function formatTimestamp(value: number): string {
@@ -21,7 +22,7 @@ function getStartupMessage(params: {
   isAuthenticated: boolean;
 }): string {
   if (!params.isAuthenticated) {
-    return "Guest mode: I can help you browse/search the marketplace and explain how Anvara works. Sign in to create campaigns or manage listings.";
+    return 'Guest mode: I can help you browse/search the marketplace and explain how Anvara works. Sign in to create campaigns or manage listings.';
   }
 
   if (params.userRole === 'sponsor') {
@@ -68,6 +69,7 @@ export function AgentChatPanel() {
   } = useAgent();
 
   const [draft, setDraft] = useState('');
+  const shouldReduceMotion = useReducedMotion();
   const panelRef = useRef<HTMLDivElement | null>(null);
   const messageListRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -149,173 +151,216 @@ export function AgentChatPanel() {
     await sendMessage(nextValue);
   }, [draft, isLoading, sendMessage]);
 
-  if (!isOpen) {
-    return null;
-  }
-
   return (
-    <div className="fixed inset-x-0 bottom-0 top-[calc(max(1rem,env(safe-area-inset-top))+72px+0.75rem)] z-[59] sm:inset-auto sm:bottom-[88px] sm:right-6 sm:h-[500px] sm:w-[400px]">
-      <div className="absolute inset-0 bg-black/40 sm:hidden" onClick={close} aria-hidden="true" />
-
-      <section
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Anvara Agent"
-        className="absolute inset-0 flex flex-col border border-[var(--color-border)] bg-[var(--color-background)] shadow-2xl sm:inset-auto sm:bottom-0 sm:right-0 sm:h-[500px] sm:w-[400px] sm:rounded-2xl"
-      >
-        <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
-          <div>
-            <h2 className="text-sm font-semibold text-[var(--color-foreground)]">Anvara Agent</h2>
-            <span className="rounded-full bg-[var(--color-surface)] px-2 py-0.5 text-xs text-[var(--color-muted)]">
-              {getRoleBadgeLabel(userRole)}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => resetConversation('manual_clear')}
-              className="rounded-md border border-[var(--color-border)] px-2 py-1 text-xs text-[var(--color-muted)] hover:bg-[var(--color-surface)]"
-            >
-              Clear
-            </button>
-            <button
-              type="button"
+    <div className="pointer-events-none fixed inset-x-0 bottom-0 top-[calc(max(1rem,env(safe-area-inset-top))+72px+0.75rem)] z-[59] sm:inset-auto sm:bottom-[88px] sm:right-6 sm:h-[500px] sm:w-[400px]">
+      <AnimatePresence>
+        {isOpen ? (
+          <>
+            <div
+              className="pointer-events-auto absolute inset-0 bg-black/40 sm:hidden"
               onClick={close}
-              aria-label="Close Anvara Agent"
-              className="rounded-md p-1 text-lg text-[var(--color-muted)] hover:bg-[var(--color-surface)]"
-            >
-              ×
-            </button>
-          </div>
-        </div>
-
-        <div className="sr-only" aria-live="polite">
-          {latestAnnouncement}
-        </div>
-
-        <div ref={messageListRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4" aria-live="polite">
-          {messages.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-[var(--color-border)] p-3 text-sm text-[var(--color-muted)]">
-              {getStartupMessage({ userRole, isAuthenticated })}
-            </p>
-          ) : null}
-
-          {messages.map((message) => {
-            const isUser = message.role === 'user';
-            const isStatus = message.role === 'status';
-
-            return (
-              <article key={message.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-                <div
-                  className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
-                    isUser
-                      ? 'bg-[var(--color-primary)] text-white'
-                      : isStatus
-                        ? message.isError
-                          ? 'border border-red-200 bg-red-50 text-red-700'
-                          : 'border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)]'
-                        : message.isError
-                          ? 'border border-red-200 bg-red-50 text-red-700'
-                          : 'bg-[var(--color-surface)] text-[var(--color-foreground)]'
-                  }`}
-                >
-                  <p>{message.content}</p>
-                  {message.ragResults ? (
-                    <section className="mt-3 space-y-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] p-2 text-left">
-                      <p className="text-[11px] text-[var(--color-muted)]">
-                        {message.ragResults.phase === 'retrieval'
-                          ? 'Retrieval-only results'
-                          : 'LLM-ranked results'}
-                        {' • '}
-                        Retrieved {message.ragResults.retrievalCount}
-                        {message.ragResults.generationFailed ? ' • Ranking fallback used' : ''}
-                      </p>
-
-                      {message.ragResults.results.length === 0 ? (
-                        <p className="text-xs text-[var(--color-muted)]">No matching listings found.</p>
-                      ) : (
-                        <div className="space-y-2">
-                          {message.ragResults.results.map((result) => (
-                            <article
-                              key={result.adSlot.id}
-                              className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-2"
-                            >
-                              <div className="flex items-start justify-between gap-2">
-                                <p className="text-xs font-medium text-[var(--color-foreground)]">
-                                  {result.rank}. {result.adSlot.name}
-                                </p>
-                                <span className="text-[10px] text-[var(--color-muted)]">
-                                  {Math.round(result.relevanceScore * 100)}%
-                                </span>
-                              </div>
-                              <p className="mt-1 text-[11px] text-[var(--color-muted)]">
-                                {result.adSlot.publisher?.name ?? 'Unknown publisher'} • {result.adSlot.type} •{' '}
-                                {formatUsd(result.adSlot.basePrice)}
-                              </p>
-                              {result.explanation ? (
-                                <p className="mt-1 text-[11px] text-[var(--color-foreground)]">
-                                  {result.explanation}
-                                </p>
-                              ) : null}
-                            </article>
-                          ))}
-                        </div>
-                      )}
-                    </section>
-                  ) : null}
-                  <p className={`mt-1 text-[10px] ${isUser ? 'text-white/80' : 'text-[var(--color-muted)]'}`}>
-                    {formatTimestamp(message.createdAt)}
-                  </p>
-                </div>
-              </article>
-            );
-          })}
-
-          {isLoading ? (
-            <div className="flex justify-start">
-              <TypingIndicator />
-            </div>
-          ) : null}
-        </div>
-
-        <div className="border-t border-[var(--color-border)] px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:py-3">
-          {isOffline ? (
-            <p className="mb-2 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs text-amber-800">
-              You are offline. Messages will resume when your connection returns.
-            </p>
-          ) : null}
-
-          <div className="flex items-end gap-2">
-            <textarea
-              ref={inputRef}
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' && !event.shiftKey) {
-                  event.preventDefault();
-                  void handleSubmit();
-                }
-              }}
-              rows={2}
-              maxLength={1000}
-              placeholder="Ask Anvara Agent..."
-              className="min-h-[48px] flex-1 resize-none rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+              aria-hidden="true"
             />
-            <button
-              type="button"
-              onClick={() => {
-                void handleSubmit();
-              }}
-              disabled={isLoading || draft.trim().length === 0}
-              className="rounded-lg bg-[var(--color-primary)] px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--color-primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+
+            <motion.section
+              key="agent-panel"
+              ref={panelRef}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Anvara Agent"
+              className="pointer-events-auto absolute inset-0 flex flex-col border border-[var(--color-border)] bg-[var(--color-background)] shadow-2xl sm:inset-auto sm:bottom-0 sm:right-0 sm:h-[500px] sm:w-[400px] sm:rounded-2xl"
+              initial={shouldReduceMotion ? false : { opacity: 0, y: 12, scale: 0.98 }}
+              animate={
+                shouldReduceMotion
+                  ? { opacity: 1, y: 0, scale: 1 }
+                  : {
+                      opacity: 1,
+                      y: 0,
+                      scale: 1,
+                      transition: { duration: 0.22, ease: [0.22, 1, 0.36, 1] },
+                    }
+              }
+              exit={
+                shouldReduceMotion
+                  ? { opacity: 1, y: 0, scale: 1, transition: { duration: 0 } }
+                  : {
+                      opacity: 0,
+                      y: 8,
+                      scale: 0.99,
+                      transition: { duration: 0.16, ease: [0.4, 0, 1, 1] },
+                    }
+              }
             >
-              Send
-            </button>
-          </div>
-        </div>
-      </section>
+              <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
+                <div>
+                  <h2 className="text-sm font-semibold text-[var(--color-foreground)]">
+                    Anvara Agent
+                  </h2>
+                  <span className="rounded-full bg-[var(--color-surface)] px-2 py-0.5 text-xs text-[var(--color-muted)]">
+                    {getRoleBadgeLabel(userRole)}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => resetConversation('manual_clear')}
+                    className="rounded-md border border-[var(--color-border)] px-2 py-1 text-xs text-[var(--color-muted)] hover:bg-[var(--color-surface)]"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    type="button"
+                    onClick={close}
+                    aria-label="Close Anvara Agent"
+                    className="rounded-md p-1 text-lg text-[var(--color-muted)] hover:bg-[var(--color-surface)]"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+
+              <div className="sr-only" aria-live="polite">
+                {latestAnnouncement}
+              </div>
+
+              <div
+                ref={messageListRef}
+                className="flex-1 space-y-3 overflow-y-auto px-4 py-4"
+                aria-live="polite"
+              >
+                {messages.length === 0 ? (
+                  <p className="rounded-xl border border-dashed border-[var(--color-border)] p-3 text-sm text-[var(--color-muted)]">
+                    {getStartupMessage({ userRole, isAuthenticated })}
+                  </p>
+                ) : null}
+
+                {messages.map((message) => {
+                  const isUser = message.role === 'user';
+                  const isStatus = message.role === 'status';
+
+                  return (
+                    <article
+                      key={message.id}
+                      className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div
+                        className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
+                          isUser
+                            ? 'bg-[var(--color-primary)] text-white'
+                            : isStatus
+                              ? message.isError
+                                ? 'border border-red-200 bg-red-50 text-red-700'
+                                : 'border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)]'
+                              : message.isError
+                                ? 'border border-red-200 bg-red-50 text-red-700'
+                                : 'bg-[var(--color-surface)] text-[var(--color-foreground)]'
+                        }`}
+                      >
+                        <p>{message.content}</p>
+                        {message.ragResults ? (
+                          <section className="mt-3 space-y-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] p-2 text-left">
+                            <p className="text-[11px] text-[var(--color-muted)]">
+                              {message.ragResults.phase === 'retrieval'
+                                ? 'Retrieval-only results'
+                                : 'LLM-ranked results'}
+                              {' • '}
+                              Retrieved {message.ragResults.retrievalCount}
+                              {message.ragResults.generationFailed
+                                ? ' • Ranking fallback used'
+                                : ''}
+                            </p>
+
+                            {message.ragResults.results.length === 0 ? (
+                              <p className="text-xs text-[var(--color-muted)]">
+                                No matching listings found.
+                              </p>
+                            ) : (
+                              <div className="space-y-2">
+                                {message.ragResults.results.map((result) => (
+                                  <article
+                                    key={result.adSlot.id}
+                                    className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-2"
+                                  >
+                                    <div className="flex items-start justify-between gap-2">
+                                      <p className="text-xs font-medium text-[var(--color-foreground)]">
+                                        {result.rank}. {result.adSlot.name}
+                                      </p>
+                                      <span className="text-[10px] text-[var(--color-muted)]">
+                                        {Math.round(result.relevanceScore * 100)}%
+                                      </span>
+                                    </div>
+                                    <p className="mt-1 text-[11px] text-[var(--color-muted)]">
+                                      {result.adSlot.publisher?.name ?? 'Unknown publisher'} •{' '}
+                                      {result.adSlot.type} • {formatUsd(result.adSlot.basePrice)}
+                                    </p>
+                                    {result.explanation ? (
+                                      <p className="mt-1 text-[11px] text-[var(--color-foreground)]">
+                                        {result.explanation}
+                                      </p>
+                                    ) : null}
+                                  </article>
+                                ))}
+                              </div>
+                            )}
+                          </section>
+                        ) : null}
+                        <p
+                          className={`mt-1 text-[10px] ${isUser ? 'text-white/80' : 'text-[var(--color-muted)]'}`}
+                        >
+                          {formatTimestamp(message.createdAt)}
+                        </p>
+                      </div>
+                    </article>
+                  );
+                })}
+
+                {isLoading ? (
+                  <div className="flex justify-start">
+                    <TypingIndicator />
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="border-t border-[var(--color-border)] px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:py-3">
+                {isOffline ? (
+                  <p className="mb-2 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs text-amber-800">
+                    You are offline. Messages will resume when your connection returns.
+                  </p>
+                ) : null}
+
+                <div className="flex items-end gap-2">
+                  <textarea
+                    ref={inputRef}
+                    value={draft}
+                    onChange={(event) => setDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' && !event.shiftKey) {
+                        event.preventDefault();
+                        void handleSubmit();
+                      }
+                    }}
+                    rows={2}
+                    maxLength={1000}
+                    placeholder="Ask Anvara Agent..."
+                    className="min-h-[48px] flex-1 resize-none rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void handleSubmit();
+                    }}
+                    disabled={isLoading || draft.trim().length === 0}
+                    className="rounded-lg bg-[var(--color-primary)] px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--color-primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Send
+                  </button>
+                </div>
+              </div>
+            </motion.section>
+          </>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }

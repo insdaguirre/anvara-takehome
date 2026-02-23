@@ -43,7 +43,7 @@ const logos = logoFiles.map((file) => ({
 
 export function LandingCarousel() {
   return (
-    <section aria-label="Partner logos" className="py-8 md:py-10 lg:-mt-8 xl:-mt-12">
+    <section aria-label="Partner logos" className="py-4 md:py-10 lg:-mt-8 xl:-mt-12">
       <div className="mx-auto max-w-6xl px-4">
         <p className="mb-4 text-center text-sm font-semibold uppercase tracking-[0.2em] text-[rgb(var(--landing-feature-label-rgb))]">
           Trusted by teams at
