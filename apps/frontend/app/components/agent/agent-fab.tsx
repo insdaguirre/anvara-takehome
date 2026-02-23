@@ -89,7 +89,7 @@ export function AgentFab() {
         onClick={toggle}
         aria-label={isOpen ? 'Close Anvara AI Agent' : 'Open Anvara AI Agent'}
         aria-expanded={isOpen}
-        className={`group relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-white/30 bg-white/14 text-white shadow-[0_10px_24px_rgba(15,23,42,0.22),inset_0_1px_0_rgba(255,255,255,0.5)] backdrop-blur-md transition-all duration-200 hover:scale-105 hover:border-white/40 hover:bg-white/20 active:scale-95 active:bg-white/24 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-background)] motion-reduce:transition-none motion-reduce:hover:scale-100 ${
+        className={`group relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-white/30 bg-white/14 shadow-[0_10px_24px_rgba(15,23,42,0.22),inset_0_1px_0_rgba(255,255,255,0.5)] backdrop-blur-md transition-all duration-200 hover:scale-105 hover:border-white/40 hover:bg-white/20 active:scale-95 active:bg-white/24 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-background)] motion-reduce:transition-none motion-reduce:hover:scale-100 ${
           isOpen
             ? 'hidden sm:flex sm:rotate-90'
             : 'md:w-auto md:gap-1.5 md:px-2 md:pr-3 md:hover:pr-4'
@@ -100,7 +100,7 @@ export function AgentFab() {
           className="pointer-events-none absolute inset-[1px] rounded-full bg-[radial-gradient(circle_at_30%_24%,rgba(255,255,255,0.58),rgba(255,255,255,0.12)_56%,rgba(255,255,255,0)_78%)] opacity-80 transition-opacity duration-200 group-hover:opacity-95 motion-reduce:transition-none"
         />
         {isOpen ? (
-          <span aria-hidden className="relative z-[1] text-xl font-medium leading-none">
+          <span aria-hidden className="relative z-[1] text-xl font-medium leading-none text-white">
             ×
           </span>
         ) : (
@@ -115,7 +115,7 @@ export function AgentFab() {
             />
             <span
               aria-hidden="true"
-              className="relative z-[1] hidden whitespace-nowrap text-[13px] font-semibold leading-none tracking-[0.005em] text-white/90 transition-all duration-200 md:inline md:opacity-90 md:group-hover:opacity-100 motion-reduce:transition-none"
+              className="relative z-[1] hidden whitespace-nowrap text-[13px] font-semibold leading-none tracking-[0.005em] text-indigo-500 dark:text-white/90 transition-all duration-200 md:inline md:opacity-90 md:group-hover:opacity-100 motion-reduce:transition-none"
             >
               Ask Anvara
             </span>

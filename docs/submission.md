@@ -146,28 +146,28 @@ Before submitting, verify:
 
 ### Tests & Quality
 
-- [ ] `pnpm typecheck` passes with no errors
-- [ ] `pnpm lint` passes with no errors
-- [ ] `pnpm format` has been run
-- [ ] `pnpm test` passes (if you added tests)
-- [ ] `pnpm dev` starts both frontend and backend
-- [ ] Can log in as sponsor and publisher
-- [ ] All features work in the browser
+- [x] `pnpm typecheck` passes with no errors
+- [x] `pnpm lint` passes with no errors
+- [x] `pnpm format` has been run
+- [x] `pnpm test` passes (if you added tests)
+- [x] `pnpm dev` starts both frontend and backend
+- [x] Can log in as sponsor and publisher
+- [x] All features work in the browser
 
 ### Repository
 
-- [ ] All changes are committed
-- [ ] All commits are pushed to GitHub
-- [ ] Repository is **PUBLIC**
-- [ ] No sensitive data (passwords, API keys) committed
-- [ ] `.env` file is NOT committed (should be in `.gitignore`)
+- [x] All changes are committed
+- [x] All commits are pushed to GitHub
+- [x] Repository is **PUBLIC**
+- [x] No sensitive data (passwords, API keys) committed
+- [x] `.env` file is NOT committed (should be in `.gitignore`)
 
 ### Documentation
 
-- [ ] Commit messages are clear and descriptive
-- [ ] Added any necessary comments to complex code
-- [ ] Updated README if you made significant changes
-- [ ] Noted which bonus challenges you completed
+- [x] Commit messages are clear and descriptive
+- [x] Added any necessary comments to complex code
+- [x] Updated README if you made significant changes
+- [x] Noted which bonus challenges you completed
 
 ---
 
