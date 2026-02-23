@@ -1,17 +1,21 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { ChevronLeft, ChevronRight, Filter, Search, Store } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Filter, Search, Sparkles, Store } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import { EmptyState } from '@/app/components/EmptyState';
 import { ErrorState } from '@/app/components/ErrorState';
 import { SkeletonCard } from '@/app/components/SkeletonCard';
 import {
   getMarketplaceAdSlots,
+  getMarketplaceRagStatus,
   isApiError,
+  ragSearchMarketplace,
   type MarketplacePagination,
+  type MarketplaceRagSearchResponse,
+  type MarketplaceRagSearchResult,
   type PaginatedMarketplaceResponse,
 } from '@/lib/api';
 import { analytics } from '@/lib/analytics';
@@ -25,6 +29,7 @@ import {
   toMarketplaceQueryString,
   type MarketplacePageSize,
   type MarketplaceQueryState,
+  type MarketplaceSearchMode,
 } from '../query-state';
 
 const PAGE_SIZE_OPTIONS = MARKETPLACE_PAGE_SIZE_OPTIONS;
@@ -90,7 +95,19 @@ interface AdSlotGridProps {
   initialQueryState: MarketplaceQueryState;
 }
 
-// --- Pagination controls ---
+interface RagUiState {
+  results: MarketplaceRagSearchResult<MarketplaceAdSlot>[];
+  retrievalCount: number;
+  generationFailed: boolean;
+  hasSearched: boolean;
+}
+
+const defaultRagUiState: RagUiState = {
+  results: [],
+  retrievalCount: 0,
+  generationFailed: false,
+  hasSearched: false,
+};
 
 interface PaginationProps {
   pagination: MarketplacePagination;
@@ -165,7 +182,13 @@ function queryStateToFilterState(state: MarketplaceQueryState): FilterState {
   };
 }
 
-function buildQueryState(page: number, pageSize: PageSize, filters: FilterState): MarketplaceQueryState {
+function buildQueryState(
+  page: number,
+  pageSize: PageSize,
+  filters: FilterState,
+  mode: MarketplaceSearchMode,
+  ragQuery: string
+): MarketplaceQueryState {
   return {
     page,
     limit: pageSize,
@@ -174,10 +197,18 @@ function buildQueryState(page: number, pageSize: PageSize, filters: FilterState)
     availableOnly: filters.availableOnly,
     sortBy: filters.sortBy,
     search: filters.search,
+    mode,
+    ragQuery,
   };
 }
 
-// --- Main grid ---
+function toRagFilters(filters: FilterState) {
+  return {
+    ...(filters.type !== 'ALL' ? { type: filters.type } : {}),
+    ...(filters.category !== 'ALL' ? { category: filters.category } : {}),
+    available: filters.availableOnly,
+  };
+}
 
 export function AdSlotGrid({ initialResponse, initialQueryState }: AdSlotGridProps) {
   const router = useRouter();
@@ -189,12 +220,17 @@ export function AdSlotGrid({ initialResponse, initialQueryState }: AdSlotGridPro
   const [filters, setFilters] = useState<FilterState>(queryStateToFilterState(initialQueryState));
   const [page, setPage] = useState(initialQueryState.page);
   const [pageSize, setPageSize] = useState<PageSize>(initialQueryState.limit);
+  const [mode, setMode] = useState<MarketplaceSearchMode>(initialQueryState.mode);
+  const [ragQuery, setRagQuery] = useState(initialQueryState.ragQuery);
+  const [rag, setRag] = useState<RagUiState>(defaultRagUiState);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<{ message: string; isOffline: boolean } | null>(null);
   const [isOffline, setIsOffline] = useState(
     typeof navigator !== 'undefined' ? !navigator.onLine : false
   );
+
+  const [ragEnabled, setRagEnabled] = useState(false);
 
   const hasTrackedView = useRef(false);
   const hasMountedSearchRef = useRef(false);
@@ -204,7 +240,7 @@ export function AdSlotGrid({ initialResponse, initialQueryState }: AdSlotGridPro
   const lastNavigationQueryRef = useRef<string | null>(null);
   const localQueryStateRef = useRef<MarketplaceQueryState>(initialQueryState);
 
-  const loadPage = useCallback(
+  const loadKeywordPage = useCallback(
     (targetPage: number, targetSize: PageSize, activeFilters: FilterState) => {
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
         setLoading(false);
@@ -252,6 +288,58 @@ export function AdSlotGrid({ initialResponse, initialQueryState }: AdSlotGridPro
     []
   );
 
+  const loadRagResults = useCallback((query: string, activeFilters: FilterState) => {
+    const trimmed = query.trim();
+    if (trimmed.length === 0) {
+      setRag(defaultRagUiState);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setLoading(false);
+      setError({ message: 'You appear to be offline. Reconnect and try again.', isOffline: true });
+      setIsOffline(true);
+      return;
+    }
+
+    const fetchId = ++fetchIdRef.current;
+    setLoading(true);
+    setError(null);
+
+    ragSearchMarketplace<MarketplaceAdSlot>({
+      query: trimmed,
+      filters: toRagFilters(activeFilters),
+    })
+      .then((res: MarketplaceRagSearchResponse<MarketplaceAdSlot>) => {
+        if (fetchId !== fetchIdRef.current) return;
+        setRag({
+          results: res.results,
+          retrievalCount: res.retrievalCount,
+          generationFailed: res.generationFailed,
+          hasSearched: true,
+        });
+      })
+      .catch((err) => {
+        if (fetchId !== fetchIdRef.current) return;
+        const offline = isApiError(err) && err.type === 'network';
+        if (offline) setIsOffline(true);
+        setError({
+          message: isApiError(err)
+            ? err.message
+            : err instanceof Error
+              ? err.message
+              : 'Unable to load AI search results. Please try again.',
+          isOffline: offline,
+        });
+      })
+      .finally(() => {
+        if (fetchId !== fetchIdRef.current) return;
+        setLoading(false);
+      });
+  }, []);
+
   const syncUrl = useCallback(
     (nextState: MarketplaceQueryState) => {
       const nextQuery = toMarketplaceQueryString(nextState);
@@ -274,25 +362,31 @@ export function AdSlotGrid({ initialResponse, initialQueryState }: AdSlotGridPro
       setFilters(nextFilters);
       setPage(nextState.page);
       setPageSize(nextState.limit);
+      setMode(nextState.mode);
+      setRagQuery(nextState.ragQuery);
 
       if (options?.syncUrl) {
         syncUrl(nextState);
       }
 
       if (options?.fetch) {
-        loadPage(nextState.page, nextState.limit, nextFilters);
+        if (nextState.mode === 'rag') {
+          loadRagResults(nextState.ragQuery, nextFilters);
+        } else {
+          loadKeywordPage(nextState.page, nextState.limit, nextFilters);
+        }
       }
 
       if (options?.scrollToTop && typeof window !== 'undefined') {
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     },
-    [loadPage, syncUrl]
+    [loadKeywordPage, loadRagResults, syncUrl]
   );
 
   useEffect(() => {
-    localQueryStateRef.current = buildQueryState(page, pageSize, filters);
-  }, [filters, page, pageSize]);
+    localQueryStateRef.current = buildQueryState(page, pageSize, filters, mode, ragQuery);
+  }, [filters, mode, page, pageSize, ragQuery]);
 
   useEffect(() => {
     const nextState = parseMarketplaceQueryState(searchParams);
@@ -308,17 +402,66 @@ export function AdSlotGrid({ initialResponse, initialQueryState }: AdSlotGridPro
       return;
     }
 
-    // URL back/forward navigation should drive local state and refetch data.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (nextState.mode === 'rag' && !ragEnabled) {
+      const fallback = { ...nextState, mode: 'keyword' as const, ragQuery: '' };
+      // URL back/forward should force keyword mode when AI search is disabled.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      applyQueryState(fallback, { syncUrl: true, fetch: true });
+      return;
+    }
+
     applyQueryState(nextState, { fetch: true });
-  }, [applyQueryState, searchParams]);
+  }, [applyQueryState, ragEnabled, searchParams]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    getMarketplaceRagStatus()
+      .then((status) => {
+        if (cancelled) return;
+
+        setRagEnabled(status.enabled);
+
+        if (!status.enabled) {
+          const current = localQueryStateRef.current;
+          if (current.mode === 'rag') {
+            applyQueryState({ ...current, mode: 'keyword', ragQuery: '' }, { syncUrl: true, fetch: true });
+          }
+          return;
+        }
+
+        const current = localQueryStateRef.current;
+        if (current.mode === 'rag' && current.ragQuery.trim().length > 0) {
+          loadRagResults(current.ragQuery, queryStateToFilterState(current));
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+
+        setRagEnabled(false);
+
+        const current = localQueryStateRef.current;
+        if (current.mode === 'rag') {
+          applyQueryState({ ...current, mode: 'keyword', ragQuery: '' }, { syncUrl: true, fetch: true });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [applyQueryState, loadRagResults]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     const onOnline = () => {
       setIsOffline(false);
-      loadPage(page, pageSize, filters);
+      const current = localQueryStateRef.current;
+      if (current.mode === 'rag') {
+        loadRagResults(current.ragQuery, queryStateToFilterState(current));
+      } else {
+        loadKeywordPage(current.page, current.limit, queryStateToFilterState(current));
+      }
     };
 
     const onOffline = () => {
@@ -333,22 +476,26 @@ export function AdSlotGrid({ initialResponse, initialQueryState }: AdSlotGridPro
       window.removeEventListener('online', onOnline);
       window.removeEventListener('offline', onOffline);
     };
-  }, [filters, loadPage, page, pageSize]);
+  }, [loadKeywordPage, loadRagResults]);
 
   useEffect(() => {
-    if (!loading && !error && !hasTrackedView.current) {
+    if (!loading && !error && mode === 'keyword' && !hasTrackedView.current) {
       analytics.marketplaceView(pagination.total);
       hasTrackedView.current = true;
     }
-  }, [error, loading, pagination.total]);
+  }, [error, loading, mode, pagination.total]);
 
   useEffect(() => {
-    latestResultCountRef.current = pagination.total;
-  }, [pagination.total]);
+    latestResultCountRef.current = mode === 'rag' ? rag.results.length : pagination.total;
+  }, [mode, pagination.total, rag.results.length]);
 
   useEffect(() => {
     if (!hasMountedSearchRef.current) {
       hasMountedSearchRef.current = true;
+      return;
+    }
+
+    if (mode !== 'keyword') {
       return;
     }
 
@@ -359,7 +506,7 @@ export function AdSlotGrid({ initialResponse, initialQueryState }: AdSlotGridPro
     return () => {
       window.clearTimeout(timeout);
     };
-  }, [filters.search]);
+  }, [filters.search, mode]);
 
   useEffect(() => {
     if (error) analytics.marketplaceError(error.message);
@@ -367,166 +514,206 @@ export function AdSlotGrid({ initialResponse, initialQueryState }: AdSlotGridPro
 
   const handleFilterChange = useCallback(
     (next: FilterState) => {
-      applyQueryState(buildQueryState(1, pageSize, next), {
+      const nextState = buildQueryState(1, pageSize, next, mode, ragQuery);
+      applyQueryState(nextState, {
         syncUrl: true,
-        fetch: true,
+        fetch: mode === 'keyword' || nextState.ragQuery.trim().length > 0,
       });
     },
-    [applyQueryState, pageSize]
+    [applyQueryState, mode, pageSize, ragQuery]
   );
 
   const handleSearchChange = useCallback(
     (search: string) => {
       const next = { ...filters, search };
-      applyQueryState(buildQueryState(1, pageSize, next), {
+      applyQueryState(buildQueryState(1, pageSize, next, 'keyword', ragQuery), {
         syncUrl: true,
         fetch: true,
       });
       analytics.filterApply('search', search.trim());
     },
+    [applyQueryState, filters, pageSize, ragQuery]
+  );
+
+  const handleRagQueryChange = useCallback(
+    (nextRagQuery: string) => {
+      applyQueryState(buildQueryState(1, pageSize, filters, 'rag', nextRagQuery), {
+        syncUrl: false,
+        fetch: false,
+      });
+    },
     [applyQueryState, filters, pageSize]
+  );
+
+  const handleRagSearch = useCallback(() => {
+    applyQueryState(buildQueryState(1, pageSize, filters, 'rag', ragQuery), {
+      syncUrl: true,
+      fetch: true,
+    });
+  }, [applyQueryState, filters, pageSize, ragQuery]);
+
+  const handleModeChange = useCallback(
+    (nextMode: MarketplaceSearchMode) => {
+      if (nextMode === mode) return;
+      if (nextMode === 'rag' && !ragEnabled) return;
+
+      const nextState = buildQueryState(1, pageSize, filters, nextMode, ragQuery);
+      applyQueryState(nextState, {
+        syncUrl: true,
+        fetch: nextMode === 'keyword' || nextState.ragQuery.trim().length > 0,
+      });
+      analytics.filterApply('search_mode', nextMode);
+    },
+    [applyQueryState, filters, mode, pageSize, ragEnabled, ragQuery]
   );
 
   const handlePageChange = useCallback(
     (next: number) => {
       const bounded = Math.max(1, next);
-      applyQueryState(buildQueryState(bounded, pageSize, filters), {
+      applyQueryState(buildQueryState(bounded, pageSize, filters, 'keyword', ragQuery), {
         syncUrl: true,
         fetch: true,
         scrollToTop: true,
       });
     },
-    [applyQueryState, filters, pageSize]
+    [applyQueryState, filters, pageSize, ragQuery]
   );
 
   const handlePageSizeChange = useCallback(
     (next: PageSize) => {
-      applyQueryState(buildQueryState(1, next, filters), {
+      applyQueryState(buildQueryState(1, next, filters, mode, ragQuery), {
         syncUrl: true,
-        fetch: true,
+        fetch: mode === 'keyword',
       });
     },
-    [applyQueryState, filters]
+    [applyQueryState, filters, mode, ragQuery]
   );
 
   const handleRetry = useCallback(() => {
-    loadPage(page, pageSize, filters);
-  }, [filters, loadPage, page, pageSize]);
+    if (mode === 'rag') {
+      loadRagResults(ragQuery, filters);
+      return;
+    }
 
-  const hasResults = pagination.total > 0;
-  const from = hasResults ? (pagination.page - 1) * pageSize + 1 : 0;
-  const to = hasResults ? Math.min(pagination.page * pageSize, pagination.total) : 0;
+    loadKeywordPage(page, pageSize, filters);
+  }, [filters, loadKeywordPage, loadRagResults, mode, page, pageSize, ragQuery]);
 
-  if (loading && slots.length === 0) {
-    return (
-      <div className="space-y-4">
-        <div
-          className={`rounded-xl border bg-[var(--color-background)] ${
-            filters.search.trim() ? 'border-[var(--color-primary)]' : 'border-[var(--color-border)]'
-          }`}
-        >
-          <div className="relative">
-            <input
-              type="search"
-              value={filters.search}
-              onChange={(event) => handleSearchChange(event.target.value)}
-              placeholder="Search listings..."
-              aria-label="Search listings"
-              disabled={loading}
-              className="w-full rounded-t-xl border-b border-[var(--color-border)] bg-transparent py-3 pl-4 pr-10 text-sm text-[var(--color-foreground)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-50"
-            />
-            <Search
-              className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-muted)]"
-              aria-hidden="true"
-            />
-          </div>
-          <div className="p-4">
-            <MarketplaceFilters
-              filters={filters}
-              pageSize={pageSize}
-              onPageSizeChange={handlePageSizeChange}
-              onChange={handleFilterChange}
-              disabled={loading}
-            />
-          </div>
-        </div>
-        <SkeletonCard
-          variant="marketplace"
-          count={pageSize}
-          gridClassName="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
-        />
-      </div>
-    );
-  }
+  const isRagMode = mode === 'rag' && ragEnabled;
+  const isShowingRagResults = isRagMode && rag.hasSearched;
+  const ragResultsById = useMemo(() => {
+    const map = new Map<string, MarketplaceRagSearchResult<MarketplaceAdSlot>>();
+    for (const result of rag.results) {
+      map.set(result.adSlot.id, result);
+    }
+    return map;
+  }, [rag.results]);
 
-  if (error && slots.length === 0) {
-    return (
-      <div className="space-y-4">
-        <div
-          className={`rounded-xl border bg-[var(--color-background)] ${
-            filters.search.trim() ? 'border-[var(--color-primary)]' : 'border-[var(--color-border)]'
-          }`}
-        >
-          <div className="relative">
-            <input
-              type="search"
-              value={filters.search}
-              onChange={(event) => handleSearchChange(event.target.value)}
-              placeholder="Search listings..."
-              aria-label="Search listings"
-              disabled={loading}
-              className="w-full rounded-t-xl border-b border-[var(--color-border)] bg-transparent py-3 pl-4 pr-10 text-sm text-[var(--color-foreground)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-50"
-            />
-            <Search
-              className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-muted)]"
-              aria-hidden="true"
-            />
-          </div>
-          <div className="p-4">
-            <MarketplaceFilters
-              filters={filters}
-              pageSize={pageSize}
-              onPageSizeChange={handlePageSizeChange}
-              onChange={handleFilterChange}
-              disabled={loading}
-            />
-          </div>
-        </div>
-        <ErrorState
-          variant="network"
-          title="Unable to load marketplace listings"
-          message={isOffline ? 'Check your internet connection and try again.' : error.message}
-          onRetry={handleRetry}
-        />
-      </div>
-    );
-  }
+  const displayedSlots = isShowingRagResults ? rag.results.map((result) => result.adSlot) : slots;
+
+  const hasKeywordResults = pagination.total > 0;
+  const keywordFrom = hasKeywordResults ? (pagination.page - 1) * pageSize + 1 : 0;
+  const keywordTo = hasKeywordResults ? Math.min(pagination.page * pageSize, pagination.total) : 0;
+
+  const hasErrorWithoutResults = !displayedSlots.length && error !== null;
 
   return (
     <div className="space-y-4">
       <div
         className={`rounded-xl border bg-[var(--color-background)] ${
-          filters.search.trim() ? 'border-[var(--color-primary)]' : 'border-[var(--color-border)]'
+          isRagMode ? (ragQuery.trim() ? 'border-[var(--color-primary)]' : 'border-[var(--color-border)]') : filters.search.trim() ? 'border-[var(--color-primary)]' : 'border-[var(--color-border)]'
         }`}
       >
-        <div className="relative">
-          <input
-            type="search"
-            value={filters.search}
-            onChange={(event) => handleSearchChange(event.target.value)}
-            placeholder="Search listings..."
-            aria-label="Search listings"
-            disabled={loading}
-            className="w-full rounded-t-xl border-b border-[var(--color-border)] bg-transparent py-3 pl-4 pr-10 text-sm text-[var(--color-foreground)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-50"
-          />
-          <Search
-            className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-muted)]"
-            aria-hidden="true"
-          />
-        </div>
+        {(ragEnabled || mode === 'keyword') && (
+          <div className="flex items-center gap-2 border-b border-[var(--color-border)] p-3">
+            <button
+              type="button"
+              onClick={() => handleModeChange('keyword')}
+              className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                !isRagMode
+                  ? 'bg-[var(--color-primary)] text-white'
+                  : 'text-[var(--color-foreground)] hover:bg-[var(--color-border)]'
+              }`}
+              aria-pressed={!isRagMode}
+            >
+              <Search className="h-4 w-4" />
+              Search
+            </button>
+
+            {ragEnabled && (
+              <button
+                type="button"
+                onClick={() => handleModeChange('rag')}
+                className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                  isRagMode
+                    ? 'bg-[var(--color-primary)] text-white'
+                    : 'text-[var(--color-foreground)] hover:bg-[var(--color-border)]'
+                }`}
+                aria-pressed={isRagMode}
+              >
+                <Sparkles className="h-4 w-4" />
+                AI Search
+              </button>
+            )}
+          </div>
+        )}
+
+        {!isRagMode ? (
+          <div className="relative">
+            <input
+              type="search"
+              value={filters.search}
+              onChange={(event) => handleSearchChange(event.target.value)}
+              placeholder="Search listings..."
+              aria-label="Search listings"
+              disabled={loading}
+              className="w-full border-b border-[var(--color-border)] bg-transparent py-3 pl-4 pr-10 text-sm text-[var(--color-foreground)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-50"
+            />
+            <Search
+              className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-muted)]"
+              aria-hidden="true"
+            />
+          </div>
+        ) : (
+          <div className="space-y-2 border-b border-[var(--color-border)] p-4">
+            <textarea
+              value={ragQuery}
+              onChange={(event) => {
+                if (event.target.value.length <= 500) {
+                  handleRagQueryChange(event.target.value);
+                }
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                  event.preventDefault();
+                  handleRagSearch();
+                }
+              }}
+              placeholder="Describe what you're looking for..."
+              rows={3}
+              maxLength={500}
+              disabled={loading}
+              aria-label="AI search prompt"
+              className="w-full resize-y rounded-lg border border-[var(--color-border)] bg-transparent px-3 py-2 text-sm text-[var(--color-foreground)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-50"
+            />
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-[var(--color-muted)]">{ragQuery.length}/500 characters</p>
+              <button
+                type="button"
+                onClick={handleRagSearch}
+                disabled={loading || ragQuery.trim().length === 0}
+                className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Sparkles className="h-4 w-4" />
+                Search
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="p-4">
           <MarketplaceFilters
             filters={filters}
+            mode={isRagMode ? 'rag' : 'keyword'}
             pageSize={pageSize}
             onPageSizeChange={handlePageSizeChange}
             onChange={handleFilterChange}
@@ -535,13 +722,28 @@ export function AdSlotGrid({ initialResponse, initialQueryState }: AdSlotGridPro
         </div>
       </div>
 
-      {hasResults && (
+      {!isShowingRagResults && hasKeywordResults && (
         <p className="text-sm text-[var(--color-showing-text)]">
-          Showing {from}-{to} of {pagination.total.toLocaleString()} ad slots
+          Showing {keywordFrom}-{keywordTo} of {pagination.total.toLocaleString()} ad slots
         </p>
       )}
 
-      {error && slots.length > 0 && (
+      {isShowingRagResults && !loading && !error && (
+        <p className="text-sm text-[var(--color-showing-text)]">
+          Showing {rag.results.length.toLocaleString()} AI matches from {rag.retrievalCount.toLocaleString()} retrieved listings
+        </p>
+      )}
+
+      {isRagMode && rag.generationFailed && rag.results.length > 0 && (
+        <div
+          role="status"
+          className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+        >
+          AI explanations unavailable. Showing closest matches.
+        </div>
+      )}
+
+      {error && displayedSlots.length > 0 && (
         <div
           role="alert"
           className="flex items-center justify-between gap-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
@@ -557,13 +759,31 @@ export function AdSlotGrid({ initialResponse, initialQueryState }: AdSlotGridPro
         </div>
       )}
 
-      {loading ? (
-        <SkeletonCard
-          variant="marketplace"
-          count={pageSize}
-          gridClassName="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+      {hasErrorWithoutResults ? (
+        <ErrorState
+          variant="network"
+          title={isRagMode ? 'Unable to run AI search' : 'Unable to load marketplace listings'}
+          message={isOffline ? 'Check your internet connection and try again.' : error.message}
+          onRetry={handleRetry}
         />
-      ) : slots.length === 0 && pagination.total === 0 && !error ? (
+      ) : loading ? (
+        <div className="space-y-3">
+          {isRagMode && <p className="text-sm text-[var(--color-muted)]">Searching with AI…</p>}
+          <SkeletonCard
+            variant="marketplace"
+            count={isRagMode ? 10 : pageSize}
+            gridClassName="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          />
+        </div>
+      ) : isRagMode && rag.hasSearched && displayedSlots.length === 0 ? (
+        <EmptyState
+          variant="filter"
+          icon={Sparkles}
+          title="No matches found"
+          description="Try rephrasing your query."
+          action={{ label: 'Try Again', onClick: handleRagSearch }}
+        />
+      ) : !isShowingRagResults && displayedSlots.length === 0 && pagination.total === 0 && !error ? (
         <EmptyState
           icon={Store}
           title="The marketplace is launching soon"
@@ -571,7 +791,7 @@ export function AdSlotGrid({ initialResponse, initialQueryState }: AdSlotGridPro
           action={{ label: 'Contact Us', href: '/contact' }}
           secondaryAction={{ label: 'List Your Inventory', href: '/dashboard/publisher' }}
         />
-      ) : slots.length === 0 && !error ? (
+      ) : !isShowingRagResults && displayedSlots.length === 0 && !error ? (
         <EmptyState
           variant="filter"
           icon={Filter}
@@ -581,18 +801,19 @@ export function AdSlotGrid({ initialResponse, initialQueryState }: AdSlotGridPro
         />
       ) : (
         <motion.div
-          key={`${page}-${pageSize}-${filters.type}-${filters.category}-${filters.availableOnly}-${filters.search}-${filters.sortBy}`}
+          key={`${mode}-${page}-${pageSize}-${filters.type}-${filters.category}-${filters.availableOnly}-${filters.search}-${filters.sortBy}-${ragQuery}`}
           className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
           variants={shouldReduceMotion ? undefined : gridEntranceVariants}
           initial={shouldReduceMotion ? false : 'hidden'}
           animate={shouldReduceMotion ? undefined : 'visible'}
         >
-          {slots.map((slot) => {
+          {displayedSlots.map((slot) => {
             const category = slot.publisher?.category ?? '';
             const stripeColor = categoryColors[category] || 'bg-gray-400';
             const views = slot.publisher?.monthlyViews ?? 0;
             const subscribers = slot.publisher?.subscriberCount ?? 0;
             const placementCount = slot._count?.placements ?? 0;
+            const ragResult = isShowingRagResults ? ragResultsById.get(slot.id) : null;
 
             return (
               <motion.div key={slot.id} variants={shouldReduceMotion ? undefined : gridItemVariants}>
@@ -653,6 +874,12 @@ export function AdSlotGrid({ initialResponse, initialQueryState }: AdSlotGridPro
                       <p className="text-xs text-[var(--color-muted)]">{placementCount} past bookings</p>
                     )}
 
+                    {ragResult?.explanation && (
+                      <p className="rounded-md border border-blue-100 bg-blue-50 px-2.5 py-2 text-xs text-blue-800">
+                        {ragResult.explanation}
+                      </p>
+                    )}
+
                     <div className="flex items-end justify-between">
                       <div>
                         <span
@@ -676,7 +903,7 @@ export function AdSlotGrid({ initialResponse, initialQueryState }: AdSlotGridPro
         </motion.div>
       )}
 
-      {(pagination.total > 0 || pagination.totalPages > 0) && (
+      {!isRagMode && (pagination.total > 0 || pagination.totalPages > 0) && (
         <div className="relative flex items-center justify-center">
           <PaginationControls pagination={pagination} onPageChange={handlePageChange} disabled={loading} />
           <div className="absolute right-0 hidden items-center gap-2 text-sm sm:flex">

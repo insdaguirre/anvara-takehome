@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFormStatus } from 'react-dom';
 import type { DashboardToastInput } from '../../components/use-dashboard-toasts';
+import { useAgent } from '@/app/components/agent/agent-provider';
 import { createCampaign } from '../actions';
 import { INITIAL_CAMPAIGN_FORM_STATE, type CampaignFormState } from '../form-state';
 
@@ -27,8 +28,13 @@ interface CreateCampaignButtonProps {
 
 export function CreateCampaignButton({ onToast }: CreateCampaignButtonProps) {
   const router = useRouter();
+  const { pendingCampaignPrefill, consumeCampaignPrefill } = useAgent();
   const [isOpen, setIsOpen] = useState(false);
   const nameInputRef = useRef<HTMLInputElement | null>(null);
+  const descriptionInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const budgetInputRef = useRef<HTMLInputElement | null>(null);
+  const startDateInputRef = useRef<HTMLInputElement | null>(null);
+  const endDateInputRef = useRef<HTMLInputElement | null>(null);
   const [state, formAction] = useActionState(async (prevState: CampaignFormState, formData: FormData) => {
     const result = await createCampaign(prevState, formData);
     if (result.success) {
@@ -60,6 +66,42 @@ export function CreateCampaignButton({ onToast }: CreateCampaignButtonProps) {
       window.clearTimeout(timeout);
     };
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!pendingCampaignPrefill) return;
+
+    const { requestId, values } = pendingCampaignPrefill;
+
+    const timeout = window.setTimeout(() => {
+      setIsOpen(true);
+
+      if (typeof values.name === 'string' && nameInputRef.current) {
+        nameInputRef.current.value = values.name;
+      }
+
+      if (typeof values.description === 'string' && descriptionInputRef.current) {
+        descriptionInputRef.current.value = values.description;
+      }
+
+      if (typeof values.budget === 'number' && budgetInputRef.current) {
+        budgetInputRef.current.value = String(values.budget);
+      }
+
+      if (typeof values.startDate === 'string' && startDateInputRef.current) {
+        startDateInputRef.current.value = values.startDate;
+      }
+
+      if (typeof values.endDate === 'string' && endDateInputRef.current) {
+        endDateInputRef.current.value = values.endDate;
+      }
+
+      consumeCampaignPrefill(requestId);
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [consumeCampaignPrefill, pendingCampaignPrefill]);
 
   const nameErrorId = 'create-campaign-name-error';
   const descriptionErrorId = 'create-campaign-description-error';
@@ -136,6 +178,7 @@ export function CreateCampaignButton({ onToast }: CreateCampaignButtonProps) {
                   Description
                 </label>
                 <textarea
+                  ref={descriptionInputRef}
                   id="create-campaign-description"
                   name="description"
                   rows={3}
@@ -161,6 +204,7 @@ export function CreateCampaignButton({ onToast }: CreateCampaignButtonProps) {
                   Budget <span className="text-red-600">*</span>
                 </label>
                 <input
+                  ref={budgetInputRef}
                   id="create-campaign-budget"
                   name="budget"
                   type="number"
@@ -189,6 +233,7 @@ export function CreateCampaignButton({ onToast }: CreateCampaignButtonProps) {
                     Start Date <span className="text-red-600">*</span>
                   </label>
                   <input
+                    ref={startDateInputRef}
                     id="create-campaign-start-date"
                     name="startDate"
                     type="date"
@@ -213,6 +258,7 @@ export function CreateCampaignButton({ onToast }: CreateCampaignButtonProps) {
                     End Date <span className="text-red-600">*</span>
                   </label>
                   <input
+                    ref={endDateInputRef}
                     id="create-campaign-end-date"
                     name="endDate"
                     type="date"

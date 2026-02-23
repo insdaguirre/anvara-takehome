@@ -1,458 +1,352 @@
-# Anvara Sponsorship Marketplace
+# Anvara
 
-This repository started as a take-home scaffold and now reflects an implemented full-stack marketplace with role-aware dashboards, conversion flows, and instrumentation. This README documents the current behavior and architecture.
+## 1. Executive Summary
+Anvara is a full-stack sponsorship marketplace monorepo with:
+- A public marketplace for discovering publisher ad slots.
+- Role-gated dashboards for sponsors (campaign management) and publishers (ad inventory management).
+- Better Auth email/password authentication with session cookies.
+- An AI-assisted RAG search endpoint for marketplace matching.
+- An in-app agent (`/api/agent/chat`) that can navigate, prefill forms, and run marketplace RAG search via controlled tool-calling.
 
-## Current State Snapshot
+The repo currently implements local development with Dockerized Postgres + pgvector, Express API, and Next.js App Router frontend.
 
-As of **2026-02-20**:
+## 2. Architecture Overview
 
-- Monorepo: PNPM workspaces (`apps/frontend`, `apps/backend`, shared configs in `packages/*`)
-- Frontend: Next.js 16 + React 19 + Tailwind CSS v4
-- Backend: Express 5 + Prisma 7 + PostgreSQL 16
-- Auth: Better Auth (Next.js route handlers + backend session validation bridge)
-- Analytics: Client-side analytics abstraction with GA4 bridge and A/B test hooks
-- Data layer: Prisma client via `@prisma/adapter-pg`, Postgres in Docker
+### Frontend stack
+- `Next.js 16` + `React 19` (`apps/frontend`)
+- App Router (`apps/frontend/app/*`)
+- Tailwind CSS v4
+- Server Components for route-level data loading and auth/role gating.
+- Client Components for interactive UI (filters, pagination state, modals, agent chat, analytics listeners).
 
-Runtime defaults:
+### Backend stack
+- `Express 5` API (`apps/backend/src`)
+- Prisma 7 with `@prisma/adapter-pg`
+- Middleware:
+  - JSON body parsing (`20mb` limit)
+  - CORS allowlist with production fail-closed behavior
+  - Global API rate limiting in production (`/api`, excluding `/health`)
+  - Route-level rate limits for RAG and agent endpoints
+- Auth/role enforcement via Better Auth session lookup + role middleware
 
-- Node.js `>=20.0.0` (required by repo `engines`)
-- Frontend: `http://localhost:3847`
-- Backend API: `http://localhost:4291`
-- PostgreSQL: `localhost:5498`
+### Database
+- PostgreSQL 16 + `pgvector` (local Docker image `pgvector/pgvector:pg16`)
+- Prisma schema for:
+  - `Sponsor`, `Publisher`, `Campaign`, `Creative`, `AdSlot`, `Placement`, `Payment`
+- `AdSlot.embedding` is stored as `vector(1536)`.
+- Better Auth tables are created/seeded by seed script (`user`, `session`, `account`, `verification`).
 
-## Quick Start
+### RAG pipeline flow
+```mermaid
+flowchart LR
+  U["User query"] --> E["OpenAI embeddings<br/>text-embedding-3-small default"]
+  E --> V["pgvector cosine search<br/>ad_slots.embedding"]
+  V --> R[Top K retrieval + filters]
+  R --> L["Optional LLM rerank/explanations<br/>gpt-4o-mini default"]
+  L --> O[Ranked results + relevance + explanations]
+```
 
+### Agent architecture
+```mermaid
+flowchart LR
+  UI["Agent UI panel"] --> API["/api/agent/chat"]
+  API --> LLM["OpenAI Chat Completions"]
+  LLM -->|"tool_call"| TG["Tool sanitization + role gating"]
+  TG -->|"navigate/prefill/rag-search"| UI
+  TG -->|"inline rag search"| RAG["ragSearch()"]
+  RAG --> API
+  API --> UI
+```
+
+### Auth and role model
+- Better Auth is exposed in Next route handlers: `apps/frontend/app/api/auth/[...all]/route.ts`.
+- Backend validates session cookies using Better Auth server instance.
+- Role is derived from DB linkage:
+  - sponsor if `sponsors.userId = session.user.id`
+  - publisher if `publishers.userId = session.user.id`
+- Role-gated routes use middleware (`SPONSOR` or `PUBLISHER`).
+
+### Deployment model (implemented in repo)
+- Local Docker Compose for Postgres + pgvector.
+- `Dockerfile.dev` for development container tooling.
+- No implemented ECS/ECR/SQS/Modal worker/CI-CD pipeline files in this repository.
+
+## 3. Local Development Setup
+
+### Prerequisites
+- Node.js `>=20`
+- `pnpm` (repo uses `pnpm@10.28.0`)
+- Docker Desktop (or Docker Engine)
+
+### Quick setup (automated)
 ```bash
-# 1) Install, configure env, start docker db, migrate, seed
+pnpm install
 pnpm setup-project
-
-# 2) Run frontend + backend together
 pnpm dev
 ```
 
-Useful commands:
-
+### Manual setup (verified with current repo)
+1. Install deps:
 ```bash
-# Quality
-pnpm lint
-pnpm typecheck
-pnpm test
-
-# Formatting
-pnpm format
-
-# Database / reset helpers
-pnpm --filter @anvara/backend db:studio
-pnpm stop
-pnpm reset
+pnpm install
+```
+2. Create env file:
+```bash
+cp .env.example .env
+```
+3. Start database:
+```bash
+docker compose up -d
+```
+4. Run migrations + seed from backend package:
+```bash
+pnpm --filter @anvara/backend db:migrate
+pnpm --filter @anvara/backend seed
+```
+5. Optional (required for RAG retrieval quality): generate embeddings for seeded ad slots:
+```bash
+pnpm --filter @anvara/backend embed-seed
+```
+6. Run backend and frontend:
+```bash
+pnpm --filter @anvara/backend dev
+pnpm --filter @anvara/frontend dev
 ```
 
-See `docs/setup.md` for manual setup details.
+### Default local ports
+- Frontend: `http://localhost:3847`
+- Backend: `http://localhost:4291`
+- Postgres: `localhost:5498`
 
-## Demo Accounts
+## 4. Environment Variables
 
-| Role      | Email                 | Password   | Expected Dashboard         |
-| --------- | --------------------- | ---------- | -------------------------- |
-| Sponsor   | `sponsor@example.com` | `password` | `/dashboard/sponsor`       |
-| Publisher | `publisher@example.com` | `password` | `/dashboard/publisher`   |
+### Shared
+| Variable | Required | Notes |
+|---|---|---|
+| `DATABASE_URL` | Yes | Required by Prisma, backend Better Auth, frontend Better Auth server, seed/embed scripts. |
+| `BETTER_AUTH_SECRET` | Required in production | Dev fallback exists but should not be used in production. |
+| `BETTER_AUTH_URL` | Required in production | Defaults to `http://localhost:3847` in dev. |
+| `OPENAI_API_KEY` | Required when `RAG_ENABLED=true`, `AGENT_ENABLED=true`, or `embed-seed` is used | Used by embeddings, RAG rerank, and agent LLM calls. |
 
-## Implemented Features
+### Backend
+| Variable | Required | Notes |
+|---|---|---|
+| `BACKEND_PORT` | No | Default `4291`. |
+| `CORS_ALLOWED_ORIGINS` | Required in production | Comma-separated allowlist. In dev it falls back to localhost origins. |
+| `RATE_LIMIT_WINDOW_MS` | No | Production global API limiter window. Default `900000`. |
+| `RATE_LIMIT_MAX_REQUESTS` | No | Production global API limiter max. Default `120`. |
+| `RAG_ENABLED` | No | Enables `/api/marketplace/rag-search` and rag status. |
+| `RAG_EMBEDDING_MODEL` | No | Default `text-embedding-3-small`. |
+| `RAG_LLM_MODEL` | No | Default `gpt-4o-mini`. |
+| `RAG_TOP_K` | No | Default top-k for retrieval. |
+| `RAG_SIMILARITY_THRESHOLD` | No | Float `0..1`, default `0.3`. |
+| `RAG_LLM_TIMEOUT_MS` | No | LLM reranking timeout, default `10000`. |
+| `RAG_RATE_LIMIT_PER_MINUTE` | No | Route limit for rag-search, default `10`. |
+| `AGENT_ENABLED` | No | Enables `/api/agent/chat` and agent status. |
+| `AGENT_RATE_LIMIT_PER_MINUTE` | No | Agent route limit, default `20`. |
+| `AGENT_LLM_MODEL` | No | Overrides agent model (falls back to `RAG_LLM_MODEL`, then `gpt-4o-mini`). |
+| `AGENT_LLM_TIMEOUT_MS` | No | Overrides agent timeout (falls back to `RAG_LLM_TIMEOUT_MS`, then `10000`). |
+| `NODE_ENV` | Runtime | Controls trust proxy, production-only global rate limiting, and CORS fail-closed behavior. |
 
-- **Marketing landing page** (`apps/frontend/app/page.tsx`, `apps/frontend/app/components/landing/*`)
-  - Multi-section landing composition with SEO metadata in page-level `metadata`.
-- **Marketplace browse with filters + pagination** (`apps/frontend/app/marketplace/page.tsx`, `apps/frontend/app/marketplace/components/ad-slot-grid.tsx`, `apps/frontend/app/marketplace/components/marketplace-filters.tsx`)
-  - Type/category/search/availability/sort filters, server-backed pagination, loading/empty/error states.
-- **Marketplace detail + conversion paths** (`apps/frontend/app/marketplace/[id]/components/ad-slot-detail.tsx`)
-  - Detail rendering, role-based CTA branching, booking modal, quote modal, conversion analytics.
-- **Role-protected sponsor dashboard CRUD** (`apps/frontend/app/dashboard/sponsor/page.tsx`, `apps/frontend/app/dashboard/sponsor/actions.ts`)
-  - Server-side session + role gating, server action create/update/delete against backend campaign endpoints.
-- **Role-protected publisher dashboard CRUD** (`apps/frontend/app/dashboard/publisher/page.tsx`, `apps/frontend/app/dashboard/publisher/actions.ts`)
-  - Server-side session + role gating, server action create/update/delete against backend ad-slot endpoints.
-- **Newsletter signup flow** (`apps/frontend/app/components/footer-actions.ts`, `apps/backend/src/routes/newsletter.ts`)
-  - Server action submission with validation-aware error handling.
-- **Quote request flow with attachments** (`apps/frontend/app/marketplace/[id]/components/quote-modal.tsx`, `apps/backend/src/routes/quotes.ts`)
-  - Client-side attachment validation + backend field validation and quote reference response.
-- **Analytics + experimentation** (`apps/frontend/lib/analytics.ts`, `apps/frontend/hooks/use-ab-test.ts`)
-  - Event abstraction, dedupe window, attribution metadata, GA4 bridge, cookie-backed A/B assignment/exposure/outcome tracking.
+### Frontend
+| Variable | Required | Notes |
+|---|---|---|
+| `NEXT_PUBLIC_API_URL` | No | Backend API base URL. Default `http://localhost:4291`. |
+| `NEXT_PUBLIC_BETTER_AUTH_URL` | No | Better Auth client base URL. Default `http://localhost:3847`. |
+| `NEXT_PUBLIC_GA_MEASUREMENT_ID` | No | GA4 enabled only when format matches `G-...`. |
 
-## Architecture Overview
+## 5. API Overview
+All backend routes are mounted under `/api`.
 
-- **Frontend app router layer** (`apps/frontend/app/*`)
-  - Public routes: landing + marketplace.
-  - Protected routes: sponsor/publisher dashboards.
-  - Shared UX primitives: nav, shell, error/empty/skeleton states.
-- **Frontend integration layer** (`apps/frontend/lib/*`, `apps/frontend/hooks/*`)
-  - `lib/api.ts`: HTTP wrapper + normalized error model (`ApiError`).
-  - `lib/auth-helpers.ts`: centralized role lookup.
-  - `lib/analytics.ts` + `lib/ga4-bridge.ts`: instrumentation pipeline.
-  - `hooks/use-ab-test.ts`: variant assignment + exposure + outcomes.
-- **Backend route layer** (`apps/backend/src/routes/*`)
-  - Domain routes for marketplace, campaigns, ad-slots, auth, quotes, newsletter, etc.
-  - Auth and role enforcement handled via `authMiddleware` + `roleMiddleware`.
-- **Persistence layer** (`apps/backend/src/db.ts`, `apps/backend/prisma/schema.prisma`)
-  - Prisma client with Postgres adapter.
-  - Core entities: Sponsor, Publisher, Campaign, Creative, AdSlot, Placement, Payment.
-- **Auth boundaries**
-  - Next.js Better Auth handlers: `apps/frontend/app/api/auth/[...all]/route.ts`.
-  - Backend session validation bridge: `apps/backend/src/betterAuth.ts` + `apps/backend/src/auth.ts`.
+### Marketplace and RAG
+- `GET /api/marketplace/ad-slots`
+  - Public listing.
+  - Supports `page`, `limit`, `type`, `available`, `category`, `search`, `sortBy`.
+  - Returns `{ data, pagination }`.
+- `GET /api/marketplace/ad-slots/:id`
+- `GET /api/marketplace/rag-status`
+- `POST /api/marketplace/rag-search`
+  - Enabled only when `RAG_ENABLED=true` and `OPENAI_API_KEY` is set.
+  - Body: `query`, optional `topK`, `filters`, `skipRanking`.
 
-## Design Justifications
+### Agent
+- `GET /api/agent/status`
+- `POST /api/agent/chat`
+  - Enabled only when `AGENT_ENABLED=true`.
+  - Optional auth; role inferred from session when present.
+  - Tool calls are sanitized and role-checked server-side.
 
-### 1) Role-protected dashboards use server-side gating + server actions
+### Auth routes
+- Better Auth (frontend route handlers): `GET/POST /api/auth/*` (Next app route)
+- Backend auth utility routes:
+  - `POST /api/auth/login` (placeholder; returns guidance to use frontend login)
+  - `GET /api/auth/me` (authenticated session echo)
+  - `GET /api/auth/role/:userId` (role resolution)
 
-- Why this approach:
-  - `apps/frontend/app/dashboard/*/page.tsx` blocks access during SSR using session and role checks.
-  - `actions.ts` keeps mutation logic server-side and revalidates dashboard routes after writes.
-- Tradeoff:
-  - More network hops (frontend server action -> backend API) than a direct DB mutation path in Next.js.
+### Sponsor and publisher routes
+- Sponsors:
+  - `GET /api/sponsors`
+  - `GET /api/sponsors/:id`
+  - `POST /api/sponsors`
+  - `PUT /api/sponsors/:id` (sponsor role + self-scope)
+- Publishers:
+  - `GET /api/publishers`
+  - `GET /api/publishers/:id`
+  - `PUT /api/publishers/:id` (publisher role + self-scope)
 
-### 2) Marketplace discovery is client-driven for filter + pagination responsiveness
+### Dashboard, campaigns, ad slots, placements
+- Dashboard:
+  - `GET /api/dashboard` (role-scoped, authenticated)
+  - `GET /api/dashboard/stats` (public aggregate stats)
+- Campaigns (sponsor-only + scoped):
+  - `GET /api/campaigns` (paginated)
+  - `GET /api/campaigns/:id`
+  - `POST /api/campaigns`
+  - `PUT /api/campaigns/:id`
+  - `DELETE /api/campaigns/:id`
+- Ad slots (publisher-only + scoped):
+  - `GET /api/ad-slots` (paginated)
+  - `GET /api/ad-slots/:id`
+  - `POST /api/ad-slots`
+  - `PUT /api/ad-slots/:id`
+  - `DELETE /api/ad-slots/:id`
+  - `POST /api/ad-slots/:id/book` (sponsor-only)
+  - `POST /api/ad-slots/:id/unbook` (sponsor-only)
+- Placements:
+  - `GET /api/placements`
+  - `POST /api/placements`
 
-- Why this approach:
-  - `apps/frontend/app/marketplace/components/ad-slot-grid.tsx` maintains immediate filter/page interaction and retry/offline handling in one client state machine.
-- Tradeoff:
-  - First meaningful listings load happens client-side instead of SSR; this is noted in the page FIXME and can impact perceived initial load/SEO depth.
+### Conversion/support routes
+- `POST /api/newsletter/subscribe`
+- `POST /api/quotes/request`
+- `GET /api/health`
 
-### 3) Role resolution is centralized via `/api/auth/role/:userId`
-
-- Why this approach:
-  - Shared contract used by `apps/frontend/lib/auth-helpers.ts`, nav/login, and detail CTA gating reduces duplicated role-mapping logic.
-  - Backend source of truth lives in `apps/backend/src/routes/auth.ts`.
-- Tradeoff:
-  - Extra API call after session lookup in some paths.
-
-### 4) Reusable state primitives standardize UX for edge states
-
-- Why this approach:
-  - `apps/frontend/app/components/EmptyState.tsx`, `apps/frontend/app/components/ErrorState.tsx`, and `apps/frontend/app/components/SkeletonCard.tsx` create consistent loading/error/empty behavior across marketplace and dashboards.
-- Tradeoff:
-  - Shared components can limit one-off page-specific visual customization unless extended.
-
-### 5) Analytics abstraction + GA bridge isolates instrumentation concerns
-
-- Why this approach:
-  - `apps/frontend/lib/analytics.ts` normalizes event naming, deduplication, and attribution metadata while `apps/frontend/lib/ga4-bridge.ts` handles transport details.
-- Tradeoff:
-  - Custom abstraction requires discipline to keep event taxonomy consistent as features grow.
-
-### 6) CSS variable token system enables theme consistency and dark/light behavior
-
-- Why this approach:
-  - `apps/frontend/app/globals.css` defines semantic tokens (`--color-*`) and explicit light/dark overrides consumed throughout UI components.
-- Tradeoff:
-  - Theme behavior depends on keeping token usage consistent; ad hoc hardcoded colors reduce system benefits.
-
-## Information Flow Charts
-
-### Module & File Interaction Map
-
-```mermaid
-flowchart LR
-  subgraph FE_Routes[Frontend Routes]
-    LAND[app/page.tsx + landing components]
-    MARKET[app/marketplace/page.tsx + ad-slot-grid.tsx]
-    DETAIL["app/marketplace/[id]/page.tsx + ad-slot-detail.tsx"]
-    SP_DASH[app/dashboard/sponsor/page.tsx + actions.ts]
-    PB_DASH[app/dashboard/publisher/page.tsx + actions.ts]
-    NAV_LOGIN[app/components/nav.tsx + app/login/page.tsx]
-    AN_LISTENER[app/components/analytics-listener.tsx]
-  end
-
-  subgraph FE_Core[Frontend Core]
-    API_CLIENT[lib/api.ts]
-    ROLE_HELPER[lib/auth-helpers.ts]
-    ANALYTICS[lib/analytics.ts + hooks/use-ab-test.ts]
-    GA_BRIDGE[lib/ga4-bridge.ts]
-    AUTH_CLIENT[auth-client.ts]
-    AUTH_NEXT["app/api/auth/[...all]/route.ts + auth.ts"]
-  end
-
-  subgraph BE[Backend]
-    ROUTES[Express routes/*]
-    AUTH_BRIDGE[auth.ts + betterAuth.ts]
-    PRISMA[db.ts + Prisma Client]
-    PG[(PostgreSQL)]
-  end
-
-  LAND --> ANALYTICS
-  MARKET --> API_CLIENT
-  DETAIL --> API_CLIENT
-  MARKET --> ANALYTICS
-  DETAIL --> ANALYTICS
-  AN_LISTENER --> ANALYTICS
-  ANALYTICS --> GA_BRIDGE
-
-  SP_DASH --> ROLE_HELPER
-  PB_DASH --> ROLE_HELPER
-  NAV_LOGIN --> ROLE_HELPER
-  ROLE_HELPER --> ROUTES
-
-  SP_DASH --> ROUTES
-  PB_DASH --> ROUTES
-  API_CLIENT --> ROUTES
-
-  NAV_LOGIN --> AUTH_CLIENT
-  AUTH_CLIENT --> AUTH_NEXT
-  SP_DASH --> AUTH_NEXT
-  PB_DASH --> AUTH_NEXT
-
-  ROUTES --> AUTH_BRIDGE
-  ROUTES --> PRISMA
-  AUTH_NEXT --> PG
-  AUTH_BRIDGE --> PG
-  PRISMA --> PG
+### Pagination pattern
+Paginated endpoints return:
+```json
+{
+  "data": [],
+  "pagination": {
+    "page": 1,
+    "limit": 12,
+    "total": 0,
+    "totalPages": 0
+  }
+}
 ```
 
-### Authenticated Dashboard CRUD Sequence (Sponsor/Publisher)
+Implemented paginated endpoints:
+- `/api/marketplace/ad-slots`
+- `/api/campaigns`
+- `/api/ad-slots`
 
-```mermaid
-sequenceDiagram
-  autonumber
-  participant U as User
-  participant P as Next.js Dashboard Page
-  participant BA as Better Auth (Next)
-  participant RA as Role API (/api/auth/role/:userId)
-  participant SA as Server Action (actions.ts)
-  participant BR as Backend Route (/api/campaigns or /api/ad-slots)
-  participant AM as authMiddleware + roleMiddleware
-  participant PR as Prisma
-  participant DB as PostgreSQL
+## 6. RAG System
 
-  U->>P: Open /dashboard/sponsor or /dashboard/publisher
-  P->>BA: getSession(headers)
-  BA-->>P: session user or null
-  P->>RA: GET role for userId
-  RA-->>P: role + sponsorId/publisherId
+### Embeddings
+- Model: `text-embedding-3-small` by default (`RAG_EMBEDDING_MODEL` override).
+- Stored per ad slot in:
+  - `ad_slots.embedding_text`
+  - `ad_slots.embedding` (`vector(1536)`)
+- Embedding refresh occurs when:
+  - ad slots are created/updated
+  - publisher profile updates (all publisher slots refreshed asynchronously)
+  - `embed-seed` script is run
 
-  alt Not authenticated or wrong role
-    P-->>U: Redirect (/login or /)
-  else Authorized
-    P->>BR: Initial GET list with forwarded Cookie
-    BR->>AM: Validate session + role + scope
-    AM-->>BR: req.user (role + scoped IDs)
-    BR->>PR: Query scoped entities
-    PR->>DB: SQL read
-    DB-->>PR: Rows
-    PR-->>BR: Records
-    BR-->>P: JSON payload
-    P-->>U: SSR dashboard render
+### Retrieval
+- Vector similarity: cosine distance (`embedding <=> query_vector`) via pgvector.
+- Filters applied in SQL: type/category/availability.
+- Threshold gate: `RAG_SIMILARITY_THRESHOLD`.
+- Retrieval size: top-k with hard cap (20).
 
-    U->>SA: Submit create/update/delete form
-    SA->>BR: POST/PUT/DELETE with Cookie
-    BR->>AM: Authorize mutation
-    AM-->>BR: req.user
-    BR->>PR: Persist mutation
-    PR->>DB: SQL write
-    DB-->>PR: Write result
-    PR-->>BR: Entity/result
-    BR-->>SA: Success/error payload
-    SA->>P: revalidatePath('/dashboard/...') + rerender
-    P-->>U: Updated list + toast state
-  end
-```
+### Re-ranking
+- LLM model: `gpt-4o-mini` by default (`RAG_LLM_MODEL` override).
+- Ranks retrieved listings and generates brief explanations.
+- If generation fails or times out, response falls back to retrieval ordering (`generationFailed: true`).
 
-### Marketplace Discovery to Conversion Sequence
+### Performance optimizations currently implemented
+- HNSW index on `ad_slots.embedding` with cosine ops.
+- Secondary index on `placements.adSlotId`.
+- In-memory query embedding cache (LRU + TTL).
+- In-memory RAG response cache keyed by embedding+filters (LRU + TTL).
+- `SET LOCAL hnsw.ef_search = 40` per vector search transaction.
+- Global abort timeout for RAG flow (`12s`) and separate LLM timeout.
 
-```mermaid
-sequenceDiagram
-  autonumber
-  participant V as Visitor/Sponsor
-  participant G as Marketplace Grid (ad-slot-grid.tsx)
-  participant API as Frontend API Client (lib/api.ts)
-  participant MP as Backend Marketplace Routes
-  participant DP as Detail Page Client (ad-slot-detail.tsx)
-  participant AC as authClient + /api/auth/role
-  participant BK as Booking Route (/api/ad-slots/:id/book)
-  participant QT as Quote Route (/api/quotes/request)
-  participant PR as Prisma
-  participant DB as PostgreSQL
-  participant AN as Analytics Layer
-  participant GA as GA4 Bridge
+## 7. Agent System
 
-  V->>G: Open /marketplace
-  G->>API: getMarketplaceAdSlots(page, limit, filters, search, sortBy)
-  API->>MP: GET /api/marketplace/ad-slots?...query
-  MP->>PR: findMany + count
-  PR->>DB: SQL read
-  DB-->>PR: Rows + totals
-  PR-->>MP: Listings + pagination
-  MP-->>API: JSON response
-  API-->>G: data + pagination
-  G->>AN: marketplace_view/filter/search events
+### Endpoint
+- `POST /api/agent/chat`
 
-  V->>DP: Click listing card
-  DP->>API: getMarketplaceAdSlot(id)
-  API->>MP: GET /api/marketplace/ad-slots/:id
-  MP->>PR: findUnique
-  PR->>DB: SQL read
-  DB-->>PR: Slot detail
-  PR-->>MP: Slot payload
-  MP-->>DP: Detail JSON
-  DP->>AN: listing_view + CTA impression events
+### Tool-calling architecture
+Server exposes role-scoped tools to the LLM:
+- `navigate_to`
+- `run_marketplace_rag_search`
+- `prefill_campaign_form` (sponsor only)
+- `prefill_ad_slot_form` (publisher only)
 
-  DP->>AC: Resolve session + role
-  AC-->>DP: role context for CTA branching
+Tool calls are validated/sanitized before returning to client.
 
-  alt Sponsor role and slot available
-    V->>DP: Click Book CTA
-    DP->>BK: POST /api/ad-slots/:id/book
-    BK->>PR: update isAvailable=false
-    PR->>DB: SQL write
-    DB-->>PR: Updated slot
-    PR-->>BK: Result
-    BK-->>DP: booking success
-    DP->>AN: booking_submit / booking_success
-  else Anonymous or non-sponsor conversion path
-    V->>DP: Click Quote CTA
-    DP->>QT: POST /api/quotes/request
-    QT->>PR: validate ad-slot availability
-    PR->>DB: SQL read
-    DB-->>PR: Slot status
-    PR-->>QT: validation context
-    QT-->>DP: success quoteId or field errors
-    DP->>AN: quote_submit / quote_success / quote_fail
-  end
+### Frontend orchestration
+- `AgentProvider` + `useAgentChat` maintain conversation state.
+- Client executes returned tool calls (`executeAgentTool`) and posts tool results back as `tool_result` messages.
+- Max tool rounds per user message: `3`.
 
-  AN->>GA: sendGA4Event(event, properties)
-```
+### Role gating
+- Server role resolution from session (`guest`, `sponsor`, `publisher`).
+- Client-reported role is checked against server-resolved role to prevent role spoofing.
+- Route allowlists and tool allowlists vary by role.
 
-## Backend API Surface
+### Human-in-the-loop behavior
+- Form tools only prefill and navigate.
+- Agent does **not** submit campaigns or ad slots.
+- User must review and submit forms manually.
 
-Auth expectation legend:
+### Current limitations
+- Agent depends on OpenAI availability and configured API key.
+- Conversation constraints: bounded history and strict message/tool payload validation.
+- Non-whitelisted routes/tools are rejected.
 
-- `Public`: no auth middleware
-- `Authenticated`: requires valid Better Auth session via backend middleware
-- `Sponsor only`: authenticated + `SPONSOR` role
-- `Publisher only`: authenticated + `PUBLISHER` role
+## 8. Security and Hardening
+- CORS:
+  - Explicit allowlist support.
+  - Production requires `CORS_ALLOWED_ORIGINS` (fail-closed startup behavior).
+- Rate limiting:
+  - Production global API limiter (`/api`, excludes `/health`).
+  - Dedicated per-minute limiter on RAG and Agent routes.
+- Auth validation:
+  - Session validation via Better Auth on backend.
+  - Role middleware enforces sponsor/publisher permissions.
+  - Ownership checks on scoped resources (campaign/ad-slot updates/deletes).
+- Input validation:
+  - Route-level validation for body/query params.
+  - Quote attachment type/count/size checks.
+  - Agent message and tool-argument validation.
+- Production hardening:
+  - `trust proxy` enabled in production.
+  - RAG and agent feature flags default to disabled unless explicitly enabled.
 
-### Auth
+## 9. Deployment
 
-| Method | Path | Auth Expectation | Notes |
-| ------ | ---- | ---------------- | ----- |
-| POST | `/api/auth/login` | Public | Placeholder endpoint; frontend Better Auth flow is source of truth |
-| GET | `/api/auth/me` | Authenticated | Returns current user attached by middleware |
-| GET | `/api/auth/role/:userId` | Public | Resolves sponsor/publisher role mapping |
+### Implemented
+- Local Docker Compose database (`docker-compose.yml`) with pgvector image.
+- Development container image (`Dockerfile.dev`).
 
-### Marketplace (Public Read)
+### Not implemented in this repository
+- AWS ECS/ECR infrastructure
+- SQS/worker architecture
+- Modal workers
+- CI/CD workflow definitions
 
-| Method | Path | Auth Expectation | Notes |
-| ------ | ---- | ---------------- | ----- |
-| GET | `/api/marketplace/ad-slots` | Public | Filter/sort/paginate listings |
-| GET | `/api/marketplace/ad-slots/:id` | Public | Listing detail |
+## Frontend Architecture Notes (SSR/CSR)
+- App Router is used throughout.
+- SSR/Server Components:
+  - Marketplace page preloads first listing page server-side (`cache: 'no-store'`).
+  - Sponsor/publisher dashboards perform server-side session and role checks.
+- CSR/Client Components:
+  - Marketplace grid handles interactive filtering, keyword/rag mode switching, and URL sync.
+  - Detail page modals, conversion flows, and analytics tracking.
+  - Agent UI and tool execution loop.
 
-### Campaigns (Sponsor)
-
-| Method | Path | Auth Expectation | Notes |
-| ------ | ---- | ---------------- | ----- |
-| GET | `/api/campaigns` | Sponsor only | List current sponsor campaigns |
-| GET | `/api/campaigns/:id` | Sponsor only | Sponsor-owned campaign detail |
-| POST | `/api/campaigns` | Sponsor only | Create campaign |
-| PUT | `/api/campaigns/:id` | Sponsor only | Update sponsor-owned campaign |
-| DELETE | `/api/campaigns/:id` | Sponsor only | Delete sponsor-owned campaign |
-
-### Ad Slots (Publisher + Sponsor Booking)
-
-| Method | Path | Auth Expectation | Notes |
-| ------ | ---- | ---------------- | ----- |
-| GET | `/api/ad-slots` | Publisher only | List current publisher ad slots |
-| GET | `/api/ad-slots/:id` | Publisher only | Publisher-owned ad slot detail |
-| POST | `/api/ad-slots` | Publisher only | Create ad slot |
-| PUT | `/api/ad-slots/:id` | Publisher only | Update publisher-owned ad slot |
-| DELETE | `/api/ad-slots/:id` | Publisher only | Delete publisher-owned ad slot |
-| POST | `/api/ad-slots/:id/book` | Sponsor only | Mark slot booked |
-| POST | `/api/ad-slots/:id/unbook` | Sponsor only | Reset availability (testing utility path) |
-
-### Quotes and Newsletter
-
-| Method | Path | Auth Expectation | Notes |
-| ------ | ---- | ---------------- | ----- |
-| POST | `/api/quotes/request` | Public | Validated quote request with optional attachments |
-| POST | `/api/newsletter/subscribe` | Public | Validated newsletter signup (in-memory store) |
-
-### Sponsors / Publishers / Placements / Platform
-
-| Method | Path | Auth Expectation | Notes |
-| ------ | ---- | ---------------- | ----- |
-| GET | `/api/sponsors` | Public | Sponsor list |
-| GET | `/api/sponsors/:id` | Public | Sponsor detail |
-| POST | `/api/sponsors` | Public | Create sponsor |
-| PUT | `/api/sponsors/:id` | Sponsor only | Update current sponsor profile |
-| GET | `/api/publishers` | Public | Publisher list |
-| GET | `/api/publishers/:id` | Public | Publisher detail |
-| GET | `/api/placements` | Public | Placement list |
-| POST | `/api/placements` | Public | Create placement |
-| GET | `/api/dashboard/stats` | Public | Aggregate platform stats |
-| GET | `/api/health` | Public | Health + DB connectivity check |
-
-## Quality & Testing Status
-
-Status captured on **2026-02-20**:
-
-- `pnpm lint`: passes
-- `pnpm typecheck`: passes
-- `pnpm test`: fails at workspace level because:
-  - frontend has no test files (`vitest` exits with code 1)
-  - backend test file exists but tests are currently skipped/todo
-- Environment caveat:
-  - repo expects Node `>=20`, and running with older Node versions emits engine warnings
-
-## Known Gaps / Next Improvements
-
-Updated on **2026-02-20**:
-
-- ✅ Harden backend bootstrap in `apps/backend/src/index.ts`:
-  - production CORS allowlist via `CORS_ALLOWED_ORIGINS`
-  - global API rate limiting via `express-rate-limit`
-- ✅ Added missing sponsor update endpoint in `apps/backend/src/routes/sponsors.ts`:
-  - `PUT /api/sponsors/:id` (authenticated sponsor ownership required)
-- ✅ Improved marketplace fetch strategy in `apps/frontend/app/marketplace/page.tsx`:
-  - initial listings load is server-fetched with URL-driven query state hydration
-- ✅ Moved nav role lookup off the client in `apps/frontend/app/components/nav.tsx`:
-  - role resolved server-side and passed to client nav UI
-- ✅ Added global layout-level error/loading wrappers:
-  - `apps/frontend/app/global-error.tsx`
-  - `apps/frontend/app/loading.tsx`
-- Remaining gap:
-  - Increase test coverage (add frontend tests and convert backend skipped/todo tests to active assertions)
-
-## Repository Map
-
-```text
-apps/
-  frontend/
-    app/
-      api/auth/[...all]/route.ts      # Better Auth Next handler
-      dashboard/sponsor/*              # Sponsor SSR page + server actions + UI
-      dashboard/publisher/*            # Publisher SSR page + server actions + UI
-      marketplace/*                    # Public listing + detail + conversion flows
-      components/*                     # Shared UI, state primitives, nav, analytics listener
-    lib/
-      api.ts                           # API client + error normalization
-      analytics.ts                     # Event taxonomy + dedupe + attribution
-      ga4-bridge.ts                    # GA4 transport
-      auth-helpers.ts                  # Role lookup helper
-    hooks/
-      use-ab-test.ts                   # Cookie-backed A/B assignment/exposure
-    auth.ts                            # Better Auth server config
-    auth-client.ts                     # Better Auth client hooks/API
-  backend/
-    src/
-      index.ts                         # Express app bootstrap
-      auth.ts                          # Backend auth middleware + role middleware
-      betterAuth.ts                    # Better Auth instance for backend session checks
-      db.ts                            # Prisma client singleton
-      routes/*                         # API domains
-    prisma/
-      schema.prisma                    # Domain schema
-      seed.ts                          # Demo account/data seeding
-packages/
-  config/                              # Shared tsconfig
-  eslint-config/                       # Shared lint rules
-  prettier-config/                     # Shared format rules
-scripts/
-  setup.ts                             # End-to-end local setup
-  reset.ts                             # Local cleanup/reset helper
-docs/
-  setup.md                             # Setup guide
-  submission.md                        # Submission notes/process
-```
+## Database and Auth Notes
+- Local development uses Dockerized Postgres + pgvector.
+- The app is compatible with any Postgres connection string provided in `DATABASE_URL`.
+- Better Auth tables are managed outside Prisma schema and are created/seeded by `prisma/seed.ts`.

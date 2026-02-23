@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFormStatus } from 'react-dom';
 import type { DashboardToastInput } from '../../components/use-dashboard-toasts';
+import { useAgent } from '@/app/components/agent/agent-provider';
 import { createAdSlot } from '../actions';
 import { INITIAL_AD_SLOT_FORM_STATE, type AdSlotFormState } from '../form-state';
 
@@ -29,8 +30,13 @@ interface CreateAdSlotButtonProps {
 
 export function CreateAdSlotButton({ onToast }: CreateAdSlotButtonProps) {
   const router = useRouter();
+  const { pendingAdSlotPrefill, consumeAdSlotPrefill } = useAgent();
   const [isOpen, setIsOpen] = useState(false);
   const nameInputRef = useRef<HTMLInputElement | null>(null);
+  const descriptionInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const typeInputRef = useRef<HTMLSelectElement | null>(null);
+  const basePriceInputRef = useRef<HTMLInputElement | null>(null);
+  const isAvailableInputRef = useRef<HTMLInputElement | null>(null);
   const [state, formAction] = useActionState(async (prevState: AdSlotFormState, formData: FormData) => {
     const result = await createAdSlot(prevState, formData);
     if (result.success) {
@@ -61,6 +67,42 @@ export function CreateAdSlotButton({ onToast }: CreateAdSlotButtonProps) {
       window.clearTimeout(timeout);
     };
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!pendingAdSlotPrefill) return;
+
+    const { requestId, values } = pendingAdSlotPrefill;
+
+    const timeout = window.setTimeout(() => {
+      setIsOpen(true);
+
+      if (typeof values.name === 'string' && nameInputRef.current) {
+        nameInputRef.current.value = values.name;
+      }
+
+      if (typeof values.description === 'string' && descriptionInputRef.current) {
+        descriptionInputRef.current.value = values.description;
+      }
+
+      if (typeof values.type === 'string' && typeInputRef.current) {
+        typeInputRef.current.value = values.type;
+      }
+
+      if (typeof values.basePrice === 'number' && basePriceInputRef.current) {
+        basePriceInputRef.current.value = String(values.basePrice);
+      }
+
+      if (typeof values.isAvailable === 'boolean' && isAvailableInputRef.current) {
+        isAvailableInputRef.current.checked = values.isAvailable;
+      }
+
+      consumeAdSlotPrefill(requestId);
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [consumeAdSlotPrefill, pendingAdSlotPrefill]);
 
   const nameErrorId = 'create-ad-slot-name-error';
   const descriptionErrorId = 'create-ad-slot-description-error';
@@ -137,6 +179,7 @@ export function CreateAdSlotButton({ onToast }: CreateAdSlotButtonProps) {
                   Description
                 </label>
                 <textarea
+                  ref={descriptionInputRef}
                   id="create-ad-slot-description"
                   name="description"
                   rows={3}
@@ -162,6 +205,7 @@ export function CreateAdSlotButton({ onToast }: CreateAdSlotButtonProps) {
                   Type
                 </label>
                 <select
+                  ref={typeInputRef}
                   id="create-ad-slot-type"
                   name="type"
                   defaultValue={state.values?.type ?? 'DISPLAY'}
@@ -191,6 +235,7 @@ export function CreateAdSlotButton({ onToast }: CreateAdSlotButtonProps) {
                   Base Price (monthly) <span className="text-red-600">*</span>
                 </label>
                 <input
+                  ref={basePriceInputRef}
                   id="create-ad-slot-base-price"
                   name="basePrice"
                   type="number"
@@ -215,6 +260,7 @@ export function CreateAdSlotButton({ onToast }: CreateAdSlotButtonProps) {
 
               <label className="inline-flex items-center gap-2 self-end pb-1 text-sm">
                 <input
+                  ref={isAvailableInputRef}
                   name="isAvailable"
                   type="checkbox"
                   defaultChecked={state.values?.isAvailable ?? true}

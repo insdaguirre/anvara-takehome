@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { GoogleAnalytics } from '@next/third-parties/google';
 import './globals.css';
 import { AnalyticsListener } from './components/analytics-listener';
+import { AgentProvider } from './components/agent/agent-provider';
 import { Nav } from './components/nav';
 import { Footer } from './components/footer';
 
@@ -63,12 +64,14 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body className="flex min-h-screen flex-col antialiased">
-        <AnalyticsListener />
-        <Nav />
-        <main className="mx-auto w-full max-w-6xl flex-1 p-4 motion-safe:animate-[page-enter_300ms_ease-out]">
-          {children}
-        </main>
-        <Footer />
+        <AgentProvider>
+          <AnalyticsListener />
+          <Nav />
+          <main className="mx-auto w-full max-w-6xl flex-1 p-4 motion-safe:animate-[page-enter_300ms_ease-out]">
+            {children}
+          </main>
+          <Footer />
+        </AgentProvider>
         {shouldEnableGA ? <GoogleAnalytics gaId={GA_MEASUREMENT_ID} /> : null}
       </body>
     </html>

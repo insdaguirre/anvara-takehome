@@ -195,6 +195,10 @@ export function track(event: string, properties: EventProperties = {}): void {
   eventQueue.push(analyticsEvent);
 }
 
+export function trackEvent(event: string, properties: EventProperties = {}): void {
+  track(event, properties);
+}
+
 export const analytics = {
   abAssigned: (testKey: ABTestKey, variant: string) =>
     track('ab_assigned', { test_key: testKey, variant }),

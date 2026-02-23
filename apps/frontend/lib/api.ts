@@ -148,6 +148,123 @@ export interface MarketplaceAdSlotParams {
   sortBy?: string;
 }
 
+export interface MarketplaceRagFilters {
+  type?: string;
+  category?: string;
+  available?: boolean;
+}
+
+export interface MarketplaceRagSearchResult<T = unknown> {
+  adSlot: T;
+  rank: number;
+  relevanceScore: number;
+  explanation: string | null;
+}
+
+export interface MarketplaceRagSearchResponse<T = unknown> {
+  results: MarketplaceRagSearchResult<T>[];
+  query: string;
+  retrievalCount: number;
+  generationFailed: boolean;
+  phase: 'retrieval' | 'ranked';
+}
+
+export type AgentUserRole = 'sponsor' | 'publisher' | null;
+
+export interface AgentChatMessageInput {
+  role: 'user' | 'assistant' | 'tool_result';
+  content: string;
+  toolName?: string;
+}
+
+export interface AgentNavigateToolCall {
+  id: string;
+  name: 'navigate_to';
+  args: {
+    route: '/marketplace' | '/dashboard/sponsor' | '/dashboard/publisher' | '/login';
+    queryParams?: Record<string, string>;
+  };
+}
+
+export interface AgentPrefillCampaignToolCall {
+  id: string;
+  name: 'prefill_campaign_form';
+  args: {
+    name?: string;
+    description?: string;
+    budget?: number;
+    startDate?: string;
+    endDate?: string;
+  };
+}
+
+export interface AgentPrefillAdSlotToolCall {
+  id: string;
+  name: 'prefill_ad_slot_form';
+  args: {
+    name?: string;
+    description?: string;
+    type?: 'DISPLAY' | 'VIDEO' | 'NATIVE' | 'NEWSLETTER' | 'PODCAST';
+    basePrice?: number;
+    isAvailable?: boolean;
+  };
+}
+
+export interface AgentRunMarketplaceRagSearchToolCall {
+  id: string;
+  name: 'run_marketplace_rag_search';
+  args: {
+    query: string;
+    inlineResults?: boolean;
+    filters?: {
+      type?: 'DISPLAY' | 'VIDEO' | 'NATIVE' | 'NEWSLETTER' | 'PODCAST';
+      category?: string;
+      available?: boolean;
+    };
+  };
+}
+
+export interface AgentRagAdSlot {
+  id: string;
+  name: string;
+  type: 'DISPLAY' | 'VIDEO' | 'NATIVE' | 'NEWSLETTER' | 'PODCAST';
+  basePrice: number;
+  isAvailable: boolean;
+  publisher?: {
+    name?: string | null;
+    category?: string | null;
+    isVerified?: boolean | null;
+  } | null;
+}
+
+export type AgentToolCall =
+  | AgentNavigateToolCall
+  | AgentPrefillCampaignToolCall
+  | AgentPrefillAdSlotToolCall
+  | AgentRunMarketplaceRagSearchToolCall;
+
+export type AgentChatResponse =
+  | {
+      type: 'text';
+      content: string;
+      ragResults?: MarketplaceRagSearchResponse<AgentRagAdSlot>;
+    }
+  | {
+      type: 'tool_call';
+      toolCall: AgentToolCall;
+    };
+
+export interface AgentStatusResponse {
+  enabled: boolean;
+}
+
+export interface UserRoleResponse {
+  role: AgentUserRole;
+  sponsorId?: string;
+  publisherId?: string;
+  name?: string;
+}
+
 export function getMarketplaceAdSlots<T = unknown>(
   params: MarketplaceAdSlotParams = {},
   options?: ApiRequestOptions
@@ -168,6 +285,18 @@ export function getMarketplaceAdSlots<T = unknown>(
 }
 
 export const getMarketplaceAdSlot = (id: string) => api<unknown>(`/api/marketplace/ad-slots/${id}`);
+export const getMarketplaceRagStatus = () => api<{ enabled: boolean }>('/api/marketplace/rag-status');
+export function ragSearchMarketplace<T = unknown>(params: {
+  query: string;
+  topK?: number;
+  filters?: MarketplaceRagFilters;
+  skipRanking?: boolean;
+}): Promise<MarketplaceRagSearchResponse<T>> {
+  return api<MarketplaceRagSearchResponse<T>>('/api/marketplace/rag-search', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+}
 
 // Placements
 export const getPlacements = () => api<unknown[]>('/api/placements');
@@ -176,3 +305,19 @@ export const createPlacement = (data: unknown) =>
 
 // Dashboard
 export const getStats = () => api<unknown>('/api/dashboard/stats');
+
+// Agent
+export const getAgentStatus = () => api<AgentStatusResponse>('/api/agent/status');
+export function agentChat(params: {
+  messages: AgentChatMessageInput[];
+  userRole: AgentUserRole;
+}): Promise<AgentChatResponse> {
+  return api<AgentChatResponse>('/api/agent/chat', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+}
+
+export function getRoleForUser(userId: string): Promise<UserRoleResponse> {
+  return api<UserRoleResponse>(`/api/auth/role/${encodeURIComponent(userId)}`);
+}

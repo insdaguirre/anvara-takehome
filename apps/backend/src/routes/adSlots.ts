@@ -2,6 +2,7 @@ import { Router, type Response, type IRouter } from 'express';
 import { authMiddleware, roleMiddleware, type AuthRequest } from '../auth.js';
 import { prisma } from '../db.js';
 import { getParam } from '../utils/helpers.js';
+import { upsertAdSlotEmbedding } from '../utils/embeddings.js';
 
 const router: IRouter = Router();
 
@@ -254,6 +255,12 @@ router.post(
         },
       });
 
+      try {
+        await upsertAdSlotEmbedding(adSlot.id);
+      } catch (embeddingError) {
+        console.error(`Failed to update embedding for ad slot ${adSlot.id}:`, embeddingError);
+      }
+
       res.status(201).json(adSlot);
     } catch (error) {
       console.error('Error creating ad slot:', error);
@@ -495,6 +502,12 @@ router.put(
           _count: { select: { placements: true } },
         },
       });
+
+      try {
+        await upsertAdSlotEmbedding(updatedAdSlot.id);
+      } catch (embeddingError) {
+        console.error(`Failed to update embedding for ad slot ${updatedAdSlot.id}:`, embeddingError);
+      }
 
       res.status(200).json(updatedAdSlot);
     } catch (error) {

@@ -465,7 +465,7 @@ export function AdSlotDetail({ id }: Props) {
       <Link
         href="/marketplace"
         onClick={handleBackToMarketplace}
-        className="text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] hover:underline"
+        className="text-[var(--color-marketplace-back-link)] hover:text-[var(--color-marketplace-back-link-hover)] hover:underline"
       >
         ← Back to Marketplace
       </Link>

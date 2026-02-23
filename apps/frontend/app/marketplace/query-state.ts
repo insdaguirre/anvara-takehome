@@ -23,6 +23,8 @@ export type MarketplaceFilterCategory = (typeof MARKETPLACE_FILTER_CATEGORIES)[n
 
 export const MARKETPLACE_SORT_OPTIONS = ['price-desc', 'price-asc', 'name', 'audience'] as const;
 export type MarketplaceSortBy = (typeof MARKETPLACE_SORT_OPTIONS)[number];
+export const MARKETPLACE_SEARCH_MODES = ['keyword', 'rag'] as const;
+export type MarketplaceSearchMode = (typeof MARKETPLACE_SEARCH_MODES)[number];
 
 export interface MarketplaceFilterState {
   type: MarketplaceFilterType;
@@ -35,6 +37,8 @@ export interface MarketplaceFilterState {
 export interface MarketplaceQueryState extends MarketplaceFilterState {
   page: number;
   limit: MarketplacePageSize;
+  mode: MarketplaceSearchMode;
+  ragQuery: string;
 }
 
 type SearchParamRecord = Record<string, string | string[] | undefined>;
@@ -55,6 +59,8 @@ export const defaultMarketplaceQueryState: MarketplaceQueryState = {
   ...defaultMarketplaceFilters,
   page: 1,
   limit: 12,
+  mode: 'keyword',
+  ragQuery: '',
 };
 
 function isSearchParamGetter(searchParams: SearchParamInput): searchParams is SearchParamGetter {
@@ -105,6 +111,8 @@ export function parseMarketplaceQueryState(searchParams: SearchParamInput): Mark
   const rawAvailable = getFirstParamValue(searchParams, 'available');
   const rawSortBy = getFirstParamValue(searchParams, 'sortBy');
   const rawSearch = getFirstParamValue(searchParams, 'search');
+  const rawMode = getFirstParamValue(searchParams, 'mode');
+  const rawRagQuery = getFirstParamValue(searchParams, 'ragQuery');
 
   return {
     page: parsePositiveInteger(rawPage, defaultMarketplaceQueryState.page),
@@ -117,7 +125,9 @@ export function parseMarketplaceQueryState(searchParams: SearchParamInput): Mark
     ),
     availableOnly: rawAvailable === 'false' ? false : defaultMarketplaceQueryState.availableOnly,
     sortBy: parseEnumValue(rawSortBy, MARKETPLACE_SORT_OPTIONS, defaultMarketplaceQueryState.sortBy),
+    mode: parseEnumValue(rawMode, MARKETPLACE_SEARCH_MODES, defaultMarketplaceQueryState.mode),
     search: rawSearch?.trim() ?? defaultMarketplaceQueryState.search,
+    ragQuery: rawRagQuery?.trim() ?? defaultMarketplaceQueryState.ragQuery,
   };
 }
 
@@ -144,13 +154,26 @@ export function toMarketplaceQueryParams(state: MarketplaceQueryState): URLSearc
     params.set('available', String(state.availableOnly));
   }
 
-  if (state.sortBy !== defaultMarketplaceQueryState.sortBy) {
-    params.set('sortBy', state.sortBy);
+  if (state.mode !== defaultMarketplaceQueryState.mode) {
+    params.set('mode', state.mode);
   }
 
-  const trimmedSearch = state.search.trim();
-  if (trimmedSearch.length > 0) {
-    params.set('search', trimmedSearch);
+  if (state.mode === 'keyword') {
+    if (state.sortBy !== defaultMarketplaceQueryState.sortBy) {
+      params.set('sortBy', state.sortBy);
+    }
+
+    const trimmedSearch = state.search.trim();
+    if (trimmedSearch.length > 0) {
+      params.set('search', trimmedSearch);
+    }
+  }
+
+  if (state.mode === 'rag') {
+    const trimmedRagQuery = state.ragQuery.trim();
+    if (trimmedRagQuery.length > 0) {
+      params.set('ragQuery', trimmedRagQuery);
+    }
   }
 
   return params;
