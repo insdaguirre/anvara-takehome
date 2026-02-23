@@ -5,9 +5,9 @@ export function HeroSection() {
   return (
     <section
       aria-label="Hero"
-      className="relative left-1/2 flex min-h-[calc(100vh-5rem)] w-screen -translate-x-1/2 items-center overflow-hidden"
+      className="relative left-1/2 flex min-h-[calc(100vh-5rem)] w-screen -translate-x-1/2 items-center overflow-hidden lg:min-h-[calc(100vh-14rem)] lg:items-start"
     >
-      <div className="mx-auto max-w-6xl px-4 py-20 text-center md:py-24">
+      <div className="mx-auto max-w-6xl px-4 py-20 text-center md:py-24 lg:mt-16 lg:pt-16 lg:pb-10 xl:mt-24">
         <h1 className="text-4xl font-bold leading-tight tracking-tight md:text-5xl lg:text-6xl">
           Connect Sponsors with the Right Publishers
         </h1>
