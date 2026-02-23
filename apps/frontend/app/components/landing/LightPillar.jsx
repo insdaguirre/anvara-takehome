@@ -29,9 +29,11 @@ const LightPillar = ({
   const [webGLSupported, setWebGLSupported] = useState(true);
 
   useEffect(() => {
+    if (typeof document === 'undefined') return;
     const canvas = document.createElement('canvas');
     const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
     if (!gl) {
+      // Hydration guard: degrade only after mount to keep SSR and first client render aligned.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setWebGLSupported(false);
     }
@@ -81,8 +83,10 @@ const LightPillar = ({
         depth: false
       });
     } catch {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setWebGLSupported(false);
+      // WebGL constructor failed at runtime (e.g. context lost, driver crash).
+      // Defer the state update so it runs outside the synchronous effect body,
+      // avoiding a cascading render cycle.
+      setTimeout(() => setWebGLSupported(false), 0);
       return;
     }
 

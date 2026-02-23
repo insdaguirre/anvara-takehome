@@ -402,15 +402,15 @@ export function AdSlotGrid({ initialResponse, initialQueryState }: AdSlotGridPro
       return;
     }
 
+    // Defer both applyQueryState calls to avoid synchronous setState within the effect body.
     if (nextState.mode === 'rag' && !ragEnabled) {
       const fallback = { ...nextState, mode: 'keyword' as const, ragQuery: '' };
       // URL back/forward should force keyword mode when AI search is disabled.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      applyQueryState(fallback, { syncUrl: true, fetch: true });
+      setTimeout(() => applyQueryState(fallback, { syncUrl: true, fetch: true }), 0);
       return;
     }
 
-    applyQueryState(nextState, { fetch: true });
+    setTimeout(() => applyQueryState(nextState, { fetch: true }), 0);
   }, [applyQueryState, ragEnabled, searchParams]);
 
   useEffect(() => {

@@ -194,8 +194,8 @@ export function AdSlotDetail({ id }: Props) {
       Number(adSlot.basePrice),
       Boolean(adSlot.isAvailable)
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adSlot?.id]);
+    // hasTrackedListingView ref prevents re-firing when adSlot properties update after initial load.
+  }, [adSlot]);
 
   useEffect(() => {
     const slotId = adSlot?.id;
@@ -284,8 +284,7 @@ export function AdSlotDetail({ id }: Props) {
     }
 
     return () => observer.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adSlot?.id]);
+  }, [adSlot]);
 
   useEffect(() => {
     const footer = document.querySelector('footer');

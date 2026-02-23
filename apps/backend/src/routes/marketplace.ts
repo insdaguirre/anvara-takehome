@@ -9,6 +9,7 @@ import {
   ragSearch,
   type RagSearchFilters,
 } from '../utils/rag.js';
+import { parsePositiveIntegerEnv } from '../utils/env.js';
 
 const router: IRouter = Router();
 
@@ -18,18 +19,6 @@ type SortBy = (typeof VALID_SORT)[number];
 const MAX_LIMIT = 100;
 const RAG_MAX_QUERY_LENGTH = 500;
 const RAG_MAX_TOP_K = 20;
-
-function parsePositiveIntegerEnv(name: string, fallback: number): number {
-  const value = process.env[name];
-  if (!value) return fallback;
-
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed <= 0) {
-    throw new Error(`${name} must be a positive integer`);
-  }
-
-  return parsed;
-}
 
 function isRagEnabled(): boolean {
   return process.env.RAG_ENABLED?.toLowerCase() === 'true' && Boolean(process.env.OPENAI_API_KEY?.trim());
