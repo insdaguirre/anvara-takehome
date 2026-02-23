@@ -4,6 +4,7 @@ import { FeaturesSection } from './components/landing/features-section';
 import { HeroSection } from './components/landing/hero-section';
 import { HowItWorksSection } from './components/landing/how-it-works-section';
 import { LandingBackground } from './components/landing/landing-background';
+import { LandingCarousel } from './components/landing/landing-carousel';
 
 export const metadata: Metadata = {
   title: 'Anvara — The Sponsorship Marketplace for Publishers & Sponsors',
@@ -31,6 +32,7 @@ export default function Home() {
     <>
       <LandingBackground />
       <HeroSection />
+      <LandingCarousel />
       <FeaturesSection />
       <HowItWorksSection />
       <CtaSection />
