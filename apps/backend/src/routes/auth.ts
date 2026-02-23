@@ -8,7 +8,8 @@ const router: IRouter = Router();
 // NOTE: Authentication is handled by Better Auth on the frontend
 // This route is kept for any backend-specific auth utilities
 
-// POST /api/auth/login - Placeholder (Better Auth handles login via frontend)
+// POST /api/auth/login - By design: authentication is handled by Better Auth on the frontend.
+// This endpoint exists only to return a clear error for API clients that call it directly.
 router.post('/login', async (_req: Request, res: Response) => {
   res.status(400).json({
     error: 'Use the frontend login at /login instead',

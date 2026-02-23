@@ -99,6 +99,7 @@ model Campaign {
   creatives   Creative[]
   placements  Placement[]
 
+  @@index([sponsorId])
   @@map("campaigns")
 }
 
@@ -124,6 +125,7 @@ model Creative {
   campaign    Campaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   placements  Placement[]
 
+  @@index([campaignId])
   @@map("creatives")
 }
 
@@ -147,11 +149,30 @@ model AdSlot {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  publisherId String
-  publisher   Publisher  @relation(fields: [publisherId], references: [id], onDelete: Cascade)
-  placements  Placement[]
+  publisherId   String
+  publisher     Publisher      @relation(fields: [publisherId], references: [id], onDelete: Cascade)
+  placements    Placement[]
+  quoteRequests QuoteRequest[]
 
   @@map("ad_slots")
+}
+
+model QuoteRequest {
+  id          String   @id @default(cuid())
+  email       String
+  companyName String
+  phone       String?
+  budget      String?
+  goals       String?
+  timeline    String?
+  message     String
+  createdAt   DateTime @default(now())
+
+  adSlotId    String
+  adSlot      AdSlot   @relation(fields: [adSlotId], references: [id])
+
+  @@index([adSlotId])
+  @@map("quote_requests")
 }
 
 model Placement {
@@ -181,6 +202,9 @@ model Placement {
   publisherId String
   publisher   Publisher  @relation(fields: [publisherId], references: [id], onDelete: Cascade)
 
+  @@index([adSlotId])
+  @@index([campaignId])
+  @@index([publisherId])
   @@map("placements")
 }
 
@@ -203,7 +227,20 @@ model Payment {
   sponsorId   String
   sponsor     Sponsor    @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
 
+  @@index([sponsorId])
   @@map("payments")
+}
+
+// ============================================================================
+// NEWSLETTER
+// ============================================================================
+
+model NewsletterSubscription {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
+
+  @@map("newsletter_subscriptions")
 }
 
 // ============================================================================

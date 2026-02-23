@@ -4,6 +4,12 @@ import { getParam } from '../utils/helpers.js';
 
 const router: IRouter = Router();
 
+function parseDateInput(value: unknown): Date | null {
+  if (typeof value !== 'string' && !(value instanceof Date)) return null;
+  const date = new Date(value as string);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 // GET /api/placements - List placements
 router.get('/', async (req: Request, res: Response) => {
   try {
@@ -60,6 +66,14 @@ router.post('/', async (req: Request, res: Response) => {
       return;
     }
 
+    const parsedStartDate = parseDateInput(startDate);
+    const parsedEndDate = parseDateInput(endDate);
+
+    if (!parsedStartDate || !parsedEndDate) {
+      res.status(400).json({ error: 'startDate and endDate must be valid ISO date strings' });
+      return;
+    }
+
     const placement = await prisma.placement.create({
       data: {
         campaignId,
@@ -68,8 +82,8 @@ router.post('/', async (req: Request, res: Response) => {
         publisherId,
         agreedPrice,
         pricingModel: pricingModel || 'CPM',
-        startDate: new Date(startDate),
-        endDate: new Date(endDate),
+        startDate: parsedStartDate,
+        endDate: parsedEndDate,
       },
       include: {
         campaign: { select: { name: true } },

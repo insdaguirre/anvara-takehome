@@ -110,7 +110,7 @@ function validateAttachments(rawAttachments: unknown): { attachments: QuoteAttac
   return { attachments };
 }
 
-// POST /api/quotes/request - Submit quote request (dummy endpoint)
+// POST /api/quotes/request - Submit quote request
 router.post('/request', async (req: Request, res: Response) => {
   try {
     const adSlotId = parseString(req.body?.adSlotId);
@@ -194,34 +194,22 @@ router.post('/request', async (req: Request, res: Response) => {
       return;
     }
 
-    const randomSuffix = Math.random().toString(36).slice(2, 8);
-    const quoteId = `quote_${Date.now()}_${randomSuffix}`;
-
-    console.log('Quote request received:', {
-      quoteId,
-      adSlotId: adSlot.id,
-      adSlotName: adSlot.name,
-      email,
-      companyName,
-      phone: phone || null,
-      budget: budget || null,
-      goals: goals || null,
-      timeline: timeline || null,
-      message,
-      attachments:
-        attachmentValidation.attachments.length > 0
-          ? attachmentValidation.attachments.map((attachment) => ({
-              name: attachment.name,
-              type: attachment.type,
-              size: attachment.size,
-            }))
-          : [],
-      submittedAt: new Date().toISOString(),
+    const quoteRequest = await prisma.quoteRequest.create({
+      data: {
+        adSlotId: adSlot.id,
+        email,
+        companyName,
+        phone: phone ?? null,
+        budget: budget ?? null,
+        goals: goals ?? null,
+        timeline: timeline ?? null,
+        message,
+      },
     });
 
     res.status(200).json({
       success: true,
-      quoteId,
+      quoteId: quoteRequest.id,
       message: 'Thanks for your quote request! We will review it and follow up shortly.',
     });
   } catch (error) {

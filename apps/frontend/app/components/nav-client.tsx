@@ -31,6 +31,7 @@ export function NavClient({ user, role }: NavClientProps) {
   useBodyScrollLock(isMobileMenuOpen);
 
   useEffect(() => {
+    // Hydration guard: keep server and first client render identical.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);

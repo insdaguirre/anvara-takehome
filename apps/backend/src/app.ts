@@ -2,20 +2,9 @@ import express, { type Application } from 'express';
 import cors, { type CorsOptions } from 'cors';
 import rateLimit from 'express-rate-limit';
 import routes from './routes/index.js';
+import { parsePositiveIntegerEnv } from './utils/env.js';
 
 const DEFAULT_FRONTEND_ORIGIN = 'http://localhost:3847';
-
-function parsePositiveIntegerEnv(name: string, fallback: number): number {
-  const value = process.env[name];
-  if (!value) return fallback;
-
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed <= 0) {
-    throw new Error(`${name} must be a positive integer`);
-  }
-
-  return parsed;
-}
 
 function normalizeOrigin(value: string, source: string): string {
   try {
