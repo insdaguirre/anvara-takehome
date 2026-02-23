@@ -10,6 +10,7 @@ import {
   RagRequestTimeoutError,
   ragSearch,
 } from '../utils/rag.js';
+import { parsePositiveIntegerEnv } from '../utils/env.js';
 
 const router: IRouter = Router();
 
@@ -108,18 +109,6 @@ let openAIClientKey: string | null = null;
 
 function isAgentEnabled(): boolean {
   return process.env.AGENT_ENABLED?.toLowerCase() === 'true';
-}
-
-function parsePositiveIntegerEnv(name: string, fallback: number): number {
-  const value = process.env[name];
-  if (!value) return fallback;
-
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed <= 0) {
-    throw new Error(`${name} must be a positive integer`);
-  }
-
-  return parsed;
 }
 
 function getAgentModel(): string {
