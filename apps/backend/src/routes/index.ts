@@ -10,6 +10,7 @@ import healthRoutes from './health.js';
 import marketplaceRoutes from './marketplace.js';
 import newsletterRoutes from './newsletter.js';
 import quotesRoutes from './quotes.js';
+import agentRoutes from './agent.js';
 
 const router: IRouter = Router();
 
@@ -25,5 +26,6 @@ router.use('/dashboard', dashboardRoutes);
 router.use('/health', healthRoutes);
 router.use('/newsletter', newsletterRoutes);
 router.use('/quotes', quotesRoutes);
+router.use('/agent', agentRoutes);
 
 export default router;

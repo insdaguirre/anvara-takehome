@@ -30,6 +30,8 @@
   --marketplace-overlay-rgb: 255 255 255;
   --nav-dark-accent: #0a2455;
   --nav-dark-accent-rgb: 10 36 85;
+  --color-marketplace-back-link: var(--color-primary);
+  --color-marketplace-back-link-hover: var(--color-primary-hover);
 
   /* Status colors */
   --color-success: #22c55e;
@@ -53,6 +55,8 @@
   --landing-support-text-rgb: 148 163 184;
   --landing-feature-label-rgb: 148 163 184;
   --marketplace-overlay-rgb: 0 0 0;
+  --color-marketplace-back-link: var(--nav-dark-accent);
+  --color-marketplace-back-link-hover: var(--nav-dark-accent);
 }
 
 /* Follow system preference only when there is no explicit user choice. */
@@ -68,6 +72,8 @@
     --landing-support-text-rgb: 148 163 184;
     --landing-feature-label-rgb: 148 163 184;
     --marketplace-overlay-rgb: 0 0 0;
+    --color-marketplace-back-link: var(--nav-dark-accent);
+    --color-marketplace-back-link-hover: var(--nav-dark-accent);
   }
 }
 
@@ -83,6 +89,8 @@
   --landing-support-text-rgb: 203 213 225;
   --landing-feature-label-rgb: 99 102 241;
   --marketplace-overlay-rgb: 255 255 255;
+  --color-marketplace-back-link: var(--color-primary);
+  --color-marketplace-back-link-hover: var(--color-primary-hover);
 }
 
 /* Base styles */

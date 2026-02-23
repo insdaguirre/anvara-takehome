@@ -139,6 +139,8 @@ model AdSlot {
 
   basePrice   Decimal  @db.Decimal(10, 2)
   cpmFloor    Decimal? @db.Decimal(10, 2)
+  embeddingText String? @map("embedding_text")
+  embedding     Unsupported("vector(1536)")?
 
   isAvailable Boolean  @default(true)
 
